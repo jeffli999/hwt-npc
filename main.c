@@ -20,29 +20,54 @@ test_range()
 
 void test_band()
 {
+	Range		range;
 	TString		str;
-	uint32_t	point = 0x1ca8;
-//	uint32_t	point = 0x1c88;
-//	uint32_t	point = 0x12f4ff78;
-//	uint32_t	point = 0x12f4fff8;
-//	uint32_t	point = 0x1234eff8;
-//	uint32_t	point = 0x1fb8;
-	uint32_t	bank, found;
+	int			result;
 
-	str.bands[0].dim = 2; str.bands[0].seq = 3, str.bands[0].val = 0x1;
-	str.bands[1].dim = 2; str.bands[1].seq = 1, str.bands[1].val = 0xa;
+/* 1 band, MSB
+	range.lo = 0x0000;
+	range.hi = 0x0000;
+	str.nbands = 1; str.len = 16;
+	str.bands[0].dim = 2; str.bands[0].seq = 3; str.bands[0].val = 0x0;
 
-	str.nbands = 2; str.len = 16;
+	range.lo = 0x0300;
+	range.hi = 0x03f0;
+	str.nbands = 1; str.len = 16;
+	str.bands[0].dim = 2; str.bands[0].seq = 3; str.bands[0].val = 0x0;
 
-//	str.bands[0].dim = 2; str.bands[0].seq = 7, str.bands[0].val = 0x1;
-//	str.bands[1].dim = 2; str.bands[1].seq = 4, str.bands[1].val = 0x4;
-//	str.bands[2].dim = 2; str.bands[2].seq = 1, str.bands[2].val = 0x7;
+	range.lo = 0x0000;
+	range.hi = 0x0000;
+	str.nbands = 1; str.len = 16;
+	str.bands[0].dim = 2; str.bands[0].seq = 3; str.bands[0].val = 0x1;
 
-	found = find_bank(point, &str, &bank);
-	if (found)
-		printf("Found: %x\n", bank);
+	range.lo = 0x0000;
+	range.hi = 0x0a00;
+	str.nbands = 1; str.len = 16;
+	str.bands[0].dim = 2; str.bands[0].seq = 3; str.bands[0].val = 0x1;
+
+	range.lo = 0x0000;
+	range.hi = 0x1000;
+	str.nbands = 1; str.len = 16;
+	str.bands[0].dim = 2; str.bands[0].seq = 3; str.bands[0].val = 0x1;
+
+	range.lo = 0x1000;
+	range.hi = 0x1020;
+	str.nbands = 1; str.len = 16;
+	str.bands[0].dim = 2; str.bands[0].seq = 3; str.bands[0].val = 0x1;
+
+	range.lo = 0x1200;
+	range.hi = 0x1220;
+	str.nbands = 1; str.len = 16;
+	str.bands[0].dim = 2; str.bands[0].seq = 3; str.bands[0].val = 0x1;
+*/
+
+
+	result = range_overlap_bank(&range, &str);
+
+	if (result == 1)
+		printf("Overlap\n");
 	else
-		printf("Not found: %x\n", bank);
+		printf("Not Overlap\n");
 }
 
 
