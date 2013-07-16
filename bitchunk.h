@@ -21,7 +21,7 @@ typedef struct {
 } Chunk;
 
 
-int find_frame(uint32_t *frame, uint32_t point, Chunk *chunks, uint32_t num_chunks, uint32_t width);
+int find_frame(uint32_t *frame, uint32_t point, Chunk *chunks, int num_chunks, int width);
 
 
 #endif

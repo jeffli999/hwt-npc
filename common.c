@@ -12,7 +12,7 @@ int range_overlap(Range a, Range b)
 
 
 inline
-uint32_t extract_bits(uint32_t a, uint32_t hi, uint32_t lo)
+uint32_t extract_bits(uint32_t a, int hi, int lo)
 {
 	a <<= BITS - hi - 1;
 	a >>= BITS - (hi - lo) - 1;
@@ -22,9 +22,10 @@ uint32_t extract_bits(uint32_t a, uint32_t hi, uint32_t lo)
 
 
 inline
-void clear_bits(uint32_t *a, uint32_t hi, uint32_t lo)
+void clear_bits(uint32_t *a, int hi, int lo)
 {
-	uint32_t	len = hi - lo + 1, mask;
+	int			len = hi - lo + 1;
+	uint32_t	mask;
 
 	mask = ((1 << len) - 1) << lo;
 	*a = *a & (~mask);
@@ -33,9 +34,10 @@ void clear_bits(uint32_t *a, uint32_t hi, uint32_t lo)
 
 
 inline
-void keep_bits(uint32_t *a, uint32_t hi, uint32_t lo)
+void keep_bits(uint32_t *a, int hi, int lo)
 {
-	uint32_t	len = hi - lo + 1, mask;
+	int			len = hi - lo + 1;
+	uint32_t	mask;
 
 	mask = ((1 << len) - 1) << lo;
 	*a = *a & mask;
@@ -44,7 +46,7 @@ void keep_bits(uint32_t *a, uint32_t hi, uint32_t lo)
 
 
 inline
-void set_bits(uint32_t *a, uint32_t hi, uint32_t lo, uint32_t bits)
+void set_bits(uint32_t *a, int hi, int lo, uint32_t bits)
 {
 	uint32_t	mask;
 
@@ -56,7 +58,7 @@ void set_bits(uint32_t *a, uint32_t hi, uint32_t lo, uint32_t bits)
 
 
 inline
-uint32_t all_one_bits(uint32_t a, uint32_t hi, uint32_t lo)
+uint32_t all_one_bits(uint32_t a, int hi, int lo)
 {
 	uint32_t	b;
 

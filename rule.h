@@ -6,7 +6,7 @@
 #define NFIELDS	5	// number of fields
 
 typedef struct {
-	uint32_t	id;
+	int			id;
 	Range		field[NFIELDS];
 } Rule;
 

@@ -6,9 +6,9 @@
 //     +--------+
 //  p  | frame  |
 //     +--------+
-int frame_case1(uint32_t *frame, Chunk *chunks, uint32_t num_chunks, uint32_t curr_chunk)
+int frame_case1(uint32_t *frame, Chunk *chunks, int num_chunks, int curr_chunk)
 {
-	uint32_t	i, lo;
+	int			i, lo;
 	uint32_t	bits;
 printf("frame: %x\n", *frame);
 	// 1. set all low-order bits (if any) to 0 (to get the left border of the frame)
@@ -33,11 +33,10 @@ printf("frame: %x\n", *frame);
 // +--------+        +--------+
 // | frame' |  p     | frame  |
 // +--------+        +--------+
-int frame_case2(uint32_t *frame, Chunk *chunks, uint32_t num_chunks, uint32_t curr_chunk, uint32_t
-		width)
+int frame_case2(uint32_t *frame, Chunk *chunks, int num_chunks, int curr_chunk, int width)
 {
-	uint32_t	i, lo, len;
-	uint32_t	bits, found = 0;
+	int			i, lo, len, found = 0;
+	uint32_t	bits;
 
 	// 1. add the value of higher * bits by 1
 	for (i = curr_chunk; i > 0; i--) {
@@ -101,7 +100,7 @@ int frame_case2(uint32_t *frame, Chunk *chunks, uint32_t num_chunks, uint32_t cu
 // point, which is not the frame that we desire.
 // in some cases, we may not find the frame right to point, e.g,
 // 4. for point: 0001-1111-1011-1000, no frame is found no matter what values are set for * bits
-int find_frame(uint32_t *frame, uint32_t point, Chunk *chunks, uint32_t num_chunks, uint32_t width)
+int find_frame(uint32_t *frame, uint32_t point, Chunk *chunks, int num_chunks, int width)
 {
 	uint32_t	bits;
 	int			i, lo, hi, found = 0;
