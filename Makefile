@@ -1,4 +1,4 @@
-SRC=main.c common.c bitchunk.c
+SRC=main.c common.c bitband.c
 
 all: $(SRC)
-	gcc -g $(SRC) -o h-npc
+	gcc -g $(SRC) -o hwt-npc

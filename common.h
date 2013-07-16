@@ -27,10 +27,10 @@ inline
 void keep_bits(uint32_t *a, int hi, int lo);
 
 inline
-void set_bits(uint32_t *a, int hi, int lo, int bits);
+void set_bits(uint32_t *a, int hi, int lo, uint32_t bits);
 
 
 inline
-uint32_t all_one_bits(uint32_t a, int hi, int lo);
+int all_one(uint32_t a, int hi, int lo);
 
 #endif

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "common.h"
-#include "bit-chunk.h"
+#include "bitband.h"
 
 
 void
@@ -18,34 +18,36 @@ test_range()
 }
 
 
-void test_chunk()
+void test_band()
 {
-	Chunk		chunks[3];
-//	uint32_t	point = 0x1ca8;
+	TString		str;
+	uint32_t	point = 0x1ca8;
 //	uint32_t	point = 0x1c88;
-	uint32_t	point = 0x12f4ff78;
+//	uint32_t	point = 0x12f4ff78;
 //	uint32_t	point = 0x12f4fff8;
 //	uint32_t	point = 0x1234eff8;
 //	uint32_t	point = 0x1fb8;
-	uint32_t	frame, found;
+	uint32_t	bank, found;
 
-//	chunks[0].dim = 2; chunks[0].seq = 3, chunks[0].val = 0x1;
-//	chunks[1].dim = 2; chunks[1].seq = 1, chunks[1].val = 0xa;
+	str.bands[0].dim = 2; str.bands[0].seq = 3, str.bands[0].val = 0x1;
+	str.bands[1].dim = 2; str.bands[1].seq = 1, str.bands[1].val = 0xa;
 
-	chunks[0].dim = 2; chunks[0].seq = 7, chunks[0].val = 0x1;
-	chunks[1].dim = 2; chunks[1].seq = 4, chunks[1].val = 0x4;
-	chunks[2].dim = 2; chunks[2].seq = 1, chunks[2].val = 0x7;
+	str.nbands = 2; str.len = 16;
 
-	found = find_frame(&frame, point, chunks, 3, 32);
+//	str.bands[0].dim = 2; str.bands[0].seq = 7, str.bands[0].val = 0x1;
+//	str.bands[1].dim = 2; str.bands[1].seq = 4, str.bands[1].val = 0x4;
+//	str.bands[2].dim = 2; str.bands[2].seq = 1, str.bands[2].val = 0x7;
+
+	found = find_bank(point, &str, &bank);
 	if (found)
-		printf("Found: %x\n", frame);
+		printf("Found: %x\n", bank);
 	else
-		printf("Not found: %x\n", frame);
+		printf("Not found: %x\n", bank);
 }
 
 
 
 int main(int argc, char **argv)
 {
-	test_chunk();
+	test_band();
 }
