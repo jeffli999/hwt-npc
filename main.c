@@ -24,8 +24,8 @@ void test_band()
 	Range		range;
 	int			result;
 
-	range.lo = 0x1200;
-	range.hi = 0x1220;
+	range.lo = 0x1f10;
+	range.hi = 0x1f20;
 
 /*
 	tbits.dim = 2; tbits.nbands = 3; 
@@ -41,9 +41,9 @@ void test_band()
 	tbits.val = 0x1000;
 */
 
-	tbits.dim = 2; tbits.nbands = 2; 
-	tbits.bandmap[3] = tbits.bandmap[2] = 1;
-	tbits.val = 0x1000;
+	tbits.dim = 2; tbits.nbands = 1; 
+	tbits.bandmap[1] = 1;
+	tbits.val = 0x0000;
 
 	result = range_overlap_bank(&range, &tbits);
 

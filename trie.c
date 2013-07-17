@@ -90,8 +90,9 @@ void band_cut(Trie* v)
 	static TBits	path_tbits[NFIELDS];
 	static Trie*	v_parent = NULL;
 
-	TBits**			cut_tbits[CUT_BANDS];
-	Band*			cut_bands[CUT_BANDS];
+	Band			*band1, *band2;
+	TBits			*tb1, *tb2;
+	uint32_t		val1, val2;
 
 	if (v->parent != v_parent) {
 		v_parent = v->parent;
@@ -100,19 +101,26 @@ void band_cut(Trie* v)
 
 	choose_bands(v);
 
-	for (i = 0; i < CUT_BANDS; i++) {
-		cut_bands[i].dim = v->cut_bands[i].dim;
-		cut_bands[i].seq = v->cut_bands[i].seq;
-		cut_bands[i].val = 0;
-		cut_tbits[i] = add_band(path_tbits, cut_bands[i]);
-	}
-
-	for (i = 0; i < CUT_BANDS; i++) {
-		for (val = 0; val < (1 << BAND_SIZE); val++) {
-			set_tbits_val(cut_tbits[i], val);
+	// FIXME: not generalized to arbitrary CUT_BANDS (CUT_BANDS = 2 only)
+	band1 = &(v->cut_bands[0]);
+	tb1 = &(path_tbits[band1->dim]);
+	tb1->bandmap[band1->id] = 1;
+	tb1->nbands++;
+	band2 = &(v->cut_bands[1]);
+	tb2 = &(path_tbits[band2->dim]);
+	tb2->bandmap[band2->id] = 1;
+	tb2->nbands++;
+	for (val1 = 0; val1 < (1 << BAND_SIZE); val1++) {
+		set_bits(&(tb1->val), band_high(band1->id), band_low(band1->id), val1);
+		for (val2 = 0; val2 < (1 << BAND_SIZE); val2++) {
+			set_bits(&(tb2->val), band_high(band2->id), band_low(band2->id), val2);
 		}
 	}
 	
+	for (i = 0; i < MAX_CHILDREN; i++) {
+		
+	}
+
 }
 
 
