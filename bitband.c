@@ -86,11 +86,10 @@ int bank_case2(TString *str, int idx, uint32_t *bank)
 
 	// if not found yet, try the most significant * bands (if any)
 	if (i == 0) {
-		hi = band_high(str, 0);
-		if (hi == str->len - 1)
+		lo = band_high(str, 0) + 1;
+		if (lo == str->len)
 			return 0;	// no banks on the right of point
-		lo = band_low(str, 0);
-		if (all_one(*bank, hi, lo)) {
+		if (all_one(*bank, str->len-1, lo)) {
 			return 0;	// no banks on the right of point
 		} else {
 			*bank += 1 << lo;
