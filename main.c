@@ -3,8 +3,7 @@
 #include "bitband.h"
 
 
-void
-test_range()
+void test_range()
 {
 	Range	a, b;
 
@@ -24,7 +23,6 @@ void test_band()
 {
 	Range		range;
 	int			result;
-
 
 	range.lo = 0x1200;
 	range.hi = 0x1220;
