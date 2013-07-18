@@ -152,7 +152,7 @@ void choose_bands(Trie *v, TBits *path_tbits)
 
 
 // identify rules that overlap with tb1 and tb2, and create a child if rules found
-void create_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
+void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 {
 	Trie		*u;
 	Rule		*rule, **ruleset;
@@ -202,7 +202,7 @@ void create_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 
 
 // cut the space into banks using the best bit bands
-void band_cut(Trie* v)
+void create_children(Trie* v)
 {
 	static TBits	path_tbits[NFIELDS];
 	static Trie*	parent = NULL;
@@ -234,7 +234,7 @@ void band_cut(Trie* v)
 	// assign each potential child its cut band values, then try to generate the child
 	for (val0 = 0; val0 < (1 << BAND_SIZE); val0++) {
 		for (val1 = 0; val1 < (1 << BAND_SIZE); val1++) {
-			create_child(v, tb0, tb1, val0, val1);
+			new_child(v, tb0, tb1, val0, val1);
 		}
 	}
 
@@ -254,7 +254,7 @@ Trie* build_trie(Rule **rules, int nrules)
 
 	while (!queue_empty()) {
 		v = dequeue();
-		band_cut(v);
+		create_children(v);
 		for (i = 0; i < v->nchildren; i++) {
 			//if (v->children[i]->type == NONLEAF)
 			if ((v->children[i]->type == NONLEAF) || (v->layer <= 3))

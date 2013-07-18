@@ -112,7 +112,7 @@ void dump_rule(Rule *rule)
 	if (r.lo == 0 && r.hi == 0xff)
 		printf("0x00/0x00");
 	else
-		printf("0x%02x/0xff", r.lo);
+		printf("0x%02x/0xFF", r.lo);
 
 	printf("\n");
 }
