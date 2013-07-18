@@ -29,7 +29,8 @@ struct trie_t {
 };
 
 
-Trie* build_trie(Rule **rules, int nrules);
+Trie* build_trie(Rule *rules, int nrules);
+void dum_trie();
 
 
 #endif

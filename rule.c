@@ -4,7 +4,7 @@
 
 
 
-int loadrules(FILE *fp, Rule *rules)
+int loadrules(FILE *fp, Rule **ruleset)
 {
 	uint32_t 	sip1, sip2, sip3, sip4, sprefix;
 	uint32_t 	dip1, dip2, dip3, dip4, dprefix;
@@ -12,11 +12,10 @@ int loadrules(FILE *fp, Rule *rules)
 	uint32_t 	dp1, dp2;
 	uint32_t 	prot, prot_prefix;
 	uint32_t	ip, mask;
-	Rule		*rule;
+	Rule		*rule, *rules;
 	int 		num_rules = 0, ruleset_size = 1024;//number of rules
 
-	if (rules == NULL)
-		rules = (Rule *) malloc(ruleset_size * sizeof(Rule));
+	rules = (Rule *) malloc(ruleset_size * sizeof(Rule));
 
 	while (1) {
 		rule = &(rules[num_rules]);
@@ -76,8 +75,7 @@ int loadrules(FILE *fp, Rule *rules)
 		}
 	}
 
-	rules = (Rule *) realloc(rules, num_rules * sizeof(Rule));
-dump_ruleset(rules, num_rules);
+	*ruleset = (Rule *) realloc(rules, num_rules * sizeof(Rule));
 	return num_rules;
 }
 

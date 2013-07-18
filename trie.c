@@ -1,12 +1,12 @@
+#include <stdlib.h>
+#include <string.h>
 #include "trie.h"
-#include "stdlib.h"
-#include "string.h"
 
 #define		QTHRESH		0x1000000
 
 
 Trie*	trie_root;
-int		total_trie_nodes = 0;
+int		total_nodes = 0;
 
 Trie**	queue;
 int		qhead, qtail, qsize = 1024;
@@ -65,14 +65,16 @@ Trie* dequeue()
 
 
 
-Trie* init_trie(Rule **rules, int nrules)
+Trie* init_trie(Rule *rules, int nrules)
 {
 	Trie* 	node = calloc(1, sizeof(Trie));
+	int		i;
 
 	node->type = NONLEAF;
 	node->nrules = nrules;
 	node->rules = malloc(nrules * sizeof(Rule *));
-	memcpy(node->rules, rules, nrules * sizeof(Rule *));
+	for (i = 0; i < nrules; i++)
+			node->rules[i] = &rules[i];
 	
 	return node;
 }
@@ -92,19 +94,19 @@ void form_path_tbits(Trie* v, TBits* path_tbits)
 			path_tbits[i].bandmap[j] = 0;
 	}
 
-	for (v = v->parent; v != NULL; v = v->parent)
+	for (v = v->parent; v != NULL; v = v->parent) {
 		// FIXME: only applicable to CUT_BANDS = 2
 		i = v->bands[0].id;
-		p = path_tbits[v->bands[0].dim];
+		p = &path_tbits[v->bands[0].dim];
 		p->nbands++;
 		p->bandmap[i] = 1;
-		set_bits(p->val, band_high(i), band_low(i), v->bands[0].val);
+		set_bits(&p->val, band_high(i), band_low(i), v->bands[0].val);
 
 		i = v->bands[1].id;
-		p = path_tbits[v->bands[1].dim];
+		p = &path_tbits[v->bands[1].dim];
 		p->nbands++;
 		p->bandmap[i] = 1;
-		set_bits(p->val, band_high(i), band_low(i), v->bands[1].val);
+		set_bits(&p->val, band_high(i), band_low(i), v->bands[1].val);
 	}
 }
 
@@ -143,10 +145,10 @@ void choose_bands(Trie *v, TBits *path_tbits)
 */
 
 	i = v->layer;
-	v->cut_bands[0].dim = layer[i][0].dim;
-	v->cut_bands[0].id = layer[i][0].id;
-	v->cut_bands[1].dim = layer[i][1].dim;
-	v->cut_bands[1].id = layer[i][1].id;
+	v->cut_bands[0].dim = layers[i][0].dim;
+	v->cut_bands[0].id = layers[i][0].id;
+	v->cut_bands[1].dim = layers[i][1].dim;
+	v->cut_bands[1].id = layers[i][1].id;
 }
 
 
@@ -157,24 +159,24 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 	Trie		*u;
 	Rule		*rule, **ruleset;
 	Range		*f;
-	int			nrules = 0;
+	int			nrules = 0, i;
 	Band		*b0, *b1;
-
+printf("new_child[%d]@%d\n", total_nodes, v->layer+1);
 	b0 = &(v->cut_bands[0]);
 	b1 = &(v->cut_bands[1]);
 
 	set_bits(&(tb0->val), band_high(b0->id), band_low(b0->id), val0);
 	set_bits(&(tb1->val), band_high(b1->id), band_low(b1->id), val1);
 
-	u = v->children[v->nchildren];
+	u = &v->children[v->nchildren];
 	ruleset = (Rule **) malloc(v->nrules * sizeof(Rule *));
 
-	for (i = 0; i < nrules; i++) {
+	for (i = 0; i < v->nrules; i++) {
 		rule = v->rules[i];
-		f = &(rules->field[tb0->dim]);
+		f = &(rule->field[tb0->dim]);
 		if(!range_overlap_tbits(f, tb0))
 			continue;
-		f = &(rules->field[tb1->dim]);
+		f = &(rule->field[tb1->dim]);
 		if(!range_overlap_tbits(f, tb1))
 			continue;
 
@@ -188,7 +190,7 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 		ruleset = realloc(ruleset, nrules * sizeof(Rule *));
 
 	u->layer = v->layer + 1;
-	u->id = total_trie_nodes++;
+	u->id = total_nodes++;
 	u->type = NONLEAF;
 	u->parent = v;
 	u->bands[0].dim = b0->dim; u->bands[0].id = b0->id; u->bands[0].val = val0;
@@ -211,7 +213,7 @@ void create_children(Trie* v)
 	TBits			*tb0, *tb1;
 	uint32_t		val0, val1;
 
-	if (v->parent != parent) {
+	if (v->parent == NULL || v->parent != parent) {
 		parent = v->parent;
 		form_path_tbits(v, path_tbits);
 	}
@@ -243,7 +245,7 @@ void create_children(Trie* v)
 
 
 
-Trie* build_trie(Rule **rules, int nrules)
+Trie* build_trie(Rule *rules, int nrules)
 {
 	Trie*	v;
 	int		i;
@@ -257,8 +259,50 @@ Trie* build_trie(Rule **rules, int nrules)
 		create_children(v);
 		for (i = 0; i < v->nchildren; i++) {
 			//if (v->children[i]->type == NONLEAF)
-			if ((v->children[i]->type == NONLEAF) || (v->layer <= 3))
-				enqueue(v->children[i]);
+			if (v->children[i].layer < 2)
+				enqueue(&(v->children[i]));
 		}
+	}
+	printf("Trie nodes: %d\n", total_nodes);
+	dump_trie();
+}
+
+
+
+void dump_node(Trie *v)
+{
+	int			i;
+
+	printf("Node[%d]@%d ", v->id, v->layer);
+	if (v->id > 0) {
+		printf("d%d-b%d-v%x | ", v->bands[0].dim, v->bands[0].id, v->bands[0].val);
+		printf("d%d-b%d-v%x ", v->bands[1].dim, v->bands[1].id, v->bands[1].val);
+	}
+
+	printf("\nRules: ");
+	for (i = 0; i < v->nrules; i++)
+		printf("%d, ", v->rules[i]->id);
+
+	printf("\nNodes: ");
+	for (i = 0; i < v->nchildren; i++)
+		printf("%d, ", v->children[i].id);
+	printf("\n\n");
+}
+
+
+
+void dump_trie()
+{
+	Trie	*v;
+	int		i;
+
+	qhead = qtail = 0;
+
+	enqueue(trie_root);
+	while (!queue_empty()) {
+		v = dequeue();
+		dump_node(v);
+		for (i = 0; i < v->nchildren; i++)
+			enqueue(&(v->children[i]));
 	}
 }

@@ -149,8 +149,8 @@ int range_overlap_tbits(Range *range, TBits *tbits)
 
 	if (!find_bank(range->lo, tbits, &(bank.lo)))
 		return 0;
-printf("range: [%x, %x], bank.lo: %x\n", range->lo, range->hi, bank.lo);
-printf("1\n");
+//printf("range: [%x, %x], bank.lo: %x\n", range->lo, range->hi, bank.lo);
+//printf("1\n");
 	if (range->hi >= bank.lo)
 		return 1;
 	return 0;

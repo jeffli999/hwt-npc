@@ -57,7 +57,8 @@ void test_band()
 
 
 FILE		*fp = NULL;
-Rule		*rules = NULL;
+Rule		*ruleset = NULL;
+int			num_rules = 0;
 
 int main(int argc, char **argv)
 {
@@ -69,7 +70,8 @@ int main(int argc, char **argv)
 		exit(0);
 	}
 
-	loadrules(fp, rules);
+	num_rules = loadrules(fp, &ruleset);
+	build_trie(ruleset, num_rules);
 
 	fclose(fp);
 
