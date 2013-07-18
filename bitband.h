@@ -33,6 +33,6 @@ typedef struct {
 
 int find_bank(uint32_t point, TBits *tbits, uint32_t *bank);
 
-int range_overlap_bank(Range *range, TBits *tbits);
+int range_overlap_tbits(Range *range, TBits *tbits);
 
 #endif

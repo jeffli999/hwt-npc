@@ -142,8 +142,8 @@ int find_bank(uint32_t point, TBits *tbits, uint32_t *bank_lo)
 
 
 
-// To decide whether a range overlaps with a space bank
-int range_overlap_bank(Range *range, TBits *tbits)
+// To decide whether a range overlaps with a space encoded by a ternary bit string
+int range_overlap_tbits(Range *range, TBits *tbits)
 {
 	Range	bank;
 

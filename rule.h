@@ -11,4 +11,7 @@ typedef struct {
 } Rule;
 
 
+int loadrules(FILE *fp, Rule *rules);
+void dump_ruleset();
+
 #endif

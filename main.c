@@ -1,6 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "common.h"
 #include "bitband.h"
+#include "rule.h"
 
 
 void test_range()
@@ -45,7 +47,7 @@ void test_band()
 	tbits.bandmap[1] = 1;
 	tbits.val = 0x0000;
 
-	result = range_overlap_bank(&range, &tbits);
+	result = range_overlap_tbits(&range, &tbits);
 
 	if (result == 1)
 		printf("Overlap\n");
@@ -54,8 +56,22 @@ void test_band()
 }
 
 
+FILE		*fp = NULL;
+Rule		*rules = NULL;
 
 int main(int argc, char **argv)
 {
-	test_band();
+
+	fp = fopen(argv[1], "r");
+
+	if (fp == NULL) {
+		fprintf(stderr, "Failed to open file\n");
+		exit(0);
+	}
+
+	loadrules(fp, rules);
+
+	fclose(fp);
+
+	//test_band();
 }

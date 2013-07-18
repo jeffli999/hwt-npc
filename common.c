@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "common.h"
 
 
@@ -66,3 +67,25 @@ int all_one(uint32_t a, int hi, int lo)
 	b = (1 << (hi - lo + 1)) - 1;
 	return a == b ? 1 : 0;
 }
+
+
+
+// Most Significant Bit
+unsigned int MSB(unsigned int n)
+{
+	int     k = 0;
+
+	while (n >>= 1)
+		k++;
+	return  k;
+}
+
+
+void dump_ip(unsigned int ip)
+{
+	printf("%d.", extract_bits(ip, 31, 24));
+	printf("%d.", extract_bits(ip, 23, 16));
+	printf("%d.", extract_bits(ip, 15, 8));
+	printf("%d", extract_bits(ip, 7, 0));
+}
+

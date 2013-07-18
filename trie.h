@@ -24,7 +24,7 @@ struct trie_t {
 
 	Band	cut_bands[CUT_BANDS];	// cuts bands for generating children (no specific val field)
 	int		nchildren;
-	Trie**	children;
+	Trie*	children;
 	uint8_t	bandmap[MAX_CHILDREN];	// if nchildren < 256, 255 means empty child node
 };
 

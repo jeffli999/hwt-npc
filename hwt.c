@@ -67,17 +67,6 @@ void undo_hwt(val *array, int size)
 
 
 
-unsigned int int_log2(unsigned int n)
-{
-	int		k = 0;
-
-	while (n >>= 1)
-		k++;
-	return	k;
-}
-
-
-
 int
 main(int argc, char **argv)
 {
@@ -99,7 +88,7 @@ main(int argc, char **argv)
 
 	printf("0: %.1f, ", s[0]);
 	for (i = 1; i < size; i++) {
-		if (logi < int_log2(i))
+		if (logi < MSB(i))
 			printf("\n%d: ", ++logi);
 		printf("%.1f, ", s[i]);
 	}
