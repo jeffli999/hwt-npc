@@ -71,6 +71,7 @@ int main(int argc, char **argv)
 	}
 
 	num_rules = loadrules(fp, &ruleset);
+	dump_ruleset(ruleset, num_rules);
 	build_trie(ruleset, num_rules);
 
 	fclose(fp);

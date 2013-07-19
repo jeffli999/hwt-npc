@@ -132,9 +132,10 @@ int find_bank(uint32_t point, TBits *tbits, uint32_t *bank_lo)
 	}
 
 	if (nbands == tbits->nbands) { 	// case 3: point inside current bank
-		if (last_band > 0)
-			hi = band_low(last_band - 1) - 1;
-		clear_bits(bank_lo, hi, 0);
+		if (last_band > 0) {
+			hi = band_low(last_band) - 1;
+			clear_bits(bank_lo, hi, 0);
+		}
 		found = 1;
 	}
 	return found;
