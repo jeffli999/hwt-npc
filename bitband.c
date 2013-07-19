@@ -156,3 +156,18 @@ int range_overlap_tbits(Range *range, TBits *tbits)
 		return 1;
 	return 0;
 }
+
+
+
+// find the bit band that are * starting from curr_band
+inline
+int free_band(TBits *tbits, int curr_band)
+{
+	int		i;
+
+	for (i = curr_band; i >= 0; i--) {
+		if (tbits->bandmap[i] == 0)
+			return i;
+	}
+	return i;
+}

@@ -74,6 +74,13 @@ Trie* init_trie(Rule *rules, int nrules)
 
 	trie_nodes = (Trie **) malloc( 10240 * sizeof(Trie *));
 	trie_nodes[0] = node;
+
+TBits	tb;
+tb.dim = 0; tb.nbands = 0; 
+for (i = 0; i < MAX_BANDS; i++)
+	tb.bandmap[i] = 0;
+
+rule_distrib(node, &tb, 7);
 	
 	return node;
 }
@@ -123,43 +130,18 @@ void form_path_tbits(Trie* v, TBits* path_tbits)
 
 
 
-// TODO: The ultimate heuristic is HWT, but now use a simple one to test the other part
-void choose_bands(Trie *v, TBits *path_tbits)
+inline
+void set_tbits(TBits *tb, uint32_t band_id, uint32_t val)
 {
-	Band		layers[4][2];
-	int			i;
+	set_bits(&tb->val, band_high(band_id), band_low(band_id), val);
+}
 
-	layers[0][0].dim = 0; layers[0][0].id = 7;
-	layers[0][1].dim = 0; layers[0][1].id = 6;
-		
-	layers[1][0].dim = 1; layers[1][0].id = 7;
-	layers[1][1].dim = 1; layers[1][1].id = 6;
-		
-	layers[2][0].dim = 0; layers[2][0].id = 5;
-	layers[2][1].dim = 1; layers[2][1].id = 5;
-		
-	layers[3][0].dim = 3; layers[3][0].id = 3;
-	layers[3][1].dim = 3; layers[3][1].id = 2;
 
-/*
-	layers[0][0].dim = 0; layers[0][0].id = 0;
-	layers[0][1].dim = 0; layers[0][1].id = 2;
-		
-	layers[1][0].dim = 1; layers[1][0].id = 1;
-	layers[1][1].dim = 0; layers[1][1].id = 1;
-		
-	layers[2][0].dim = 0; layers[2][0].id = 5;
-	layers[2][1].dim = 1; layers[2][1].id = 0;
-		
-	layers[3][0].dim = 2; layers[3][0].id = 0;
-	layers[3][1].dim = 2; layers[3][1].id = 1;
-*/
 
-	i = v->layer;
-	v->cut_bands[0].dim = layers[i][0].dim;
-	v->cut_bands[0].id = layers[i][0].id;
-	v->cut_bands[1].dim = layers[i][1].dim;
-	v->cut_bands[1].id = layers[i][1].id;
+inline
+int rule_collide(Rule *rule, TBits *tb)
+{
+	return range_overlap_tbits(&rule->field[tb->dim], tb);
 }
 
 
@@ -173,33 +155,26 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 	int			nrules = 0, i;
 	Band		*b0, *b1;
 //printf("new_child[%d]@%d\n", total_nodes, v->layer+1);
-	b0 = &(v->cut_bands[0]);
-	b1 = &(v->cut_bands[1]);
-
-	set_bits(&(tb0->val), band_high(b0->id), band_low(b0->id), val0);
-	set_bits(&(tb1->val), band_high(b1->id), band_low(b1->id), val1);
-
-	u = &v->children[v->nchildren];
+	b0 = &v->cut_bands[0];
+	b1 = &v->cut_bands[1];
+	set_tbits(tb0, b0->id, val0);
+	set_tbits(tb1, b1->id, val1);
 	ruleset = (Rule **) malloc(v->nrules * sizeof(Rule *));
 
 	for (i = 0; i < v->nrules; i++) {
-		rule = v->rules[i];
-		f = &(rule->field[tb0->dim]);
-		if(!range_overlap_tbits(f, tb0))
-			continue;
-		f = &(rule->field[tb1->dim]);
-		if(!range_overlap_tbits(f, tb1))
-			continue;
-
-		ruleset[nrules++] = rule;
+		if (rule_collide(v->rules[i], tb0) && rule_collide(v->rules[i], tb1))
+			ruleset[nrules++] = v->rules[i];
 	}
+
 	if (nrules == 0) {
 		free(ruleset);
 		return;
 	}
+
 	if (nrules < v->nrules)
 		ruleset = realloc(ruleset, nrules * sizeof(Rule *));
 
+	u = &v->children[v->nchildren];
 	u->layer = v->layer + 1;
 	u->id = total_nodes++;
 	u->parent = v;
@@ -215,7 +190,7 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 		trie_nodes_size += 10240;
 		trie_nodes = realloc(trie_nodes, (trie_nodes_size + 10240) * sizeof(Trie *));
 	}
-	trie_nodes[total_nodes-1] = u;
+	trie_nodes[total_nodes - 1] = u;
 }
 
 

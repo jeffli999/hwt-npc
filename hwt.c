@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <inttypes.h>
+#include "hwt.h"
 
 #define SIZE 64
 
@@ -67,6 +68,7 @@ void undo_hwt(val *array, int size)
 
 
 
+/*
 int
 main(int argc, char **argv)
 {
@@ -81,23 +83,51 @@ main(int argc, char **argv)
 		s[atoi(argv[i])] = atoi(argv[i+1]);
 		num += atoi(argv[i+1]);
 	}
-	/*
-	printf("size=%d;  rules=%d\n", size, num);
-
-	do_hwt(s, size);
-
-	printf("0: %.1f, ", s[0]);
-	for (i = 1; i < size; i++) {
-		if (logi < MSB(i))
-			printf("\n%d: ", ++logi);
-		printf("%.1f, ", s[i]);
-	}
-	printf("\n\n");
-	*/
 
 	undo_hwt(s, size);
 
 	for (i = 0; i < size; i++)
 		printf("%.0f, ", s[i]);
 	printf("\n");
+}
+*/
+
+
+
+void rule_distrib(Trie *v, TBits *tb, int bid)
+{
+	int		hwt_s[1 << BAND_SIZE];
+	int		val, i, total = 0;
+
+
+	tb->nbands++;
+	tb->bandmap[bid] = 1;
+
+	for (val = 0; val < (1 << BAND_SIZE); val++) {
+		hwt_s[val] = 0;
+		set_tbits(tb, bid, val);
+		for (i = 0; i < v->nrules; i++) {
+			if (rule_collide(v->rules[i], tb))
+				hwt_s[val]++;
+		}
+	}
+
+	tb->nbands--;
+	tb->bandmap[bid] = 0;
+
+	for (val = 0; val < (1 << BAND_SIZE); val++) {
+		total += hwt_s[val];
+		printf("%d ", hwt_s[val]);
+	}
+	printf("Ratio=%d\n", (total * 100 / v->nrules));
+}
+
+
+
+void choose_bands(Trie *v, TBits *path_tbits)
+{
+	int			bid[NFIELDS], i;
+
+	for (i = 0; i < NFIELDS; i++)
+		bid[i] = free_band(&path_tbits[i], field_bands[i] - 1);
 }
