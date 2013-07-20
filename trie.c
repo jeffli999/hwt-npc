@@ -15,6 +15,7 @@ Trie**	queue;
 int		qhead, qtail, qsize = 1024;
 
 void dump_trie(Trie *root);
+void dump_node(Trie *v, int simple);
 
 
 void init_queue()
@@ -74,13 +75,6 @@ Trie* init_trie(Rule *rules, int nrules)
 
 	trie_nodes = (Trie **) malloc( 10240 * sizeof(Trie *));
 	trie_nodes[0] = node;
-
-TBits	tb;
-tb.dim = 0; tb.nbands = 0; 
-for (i = 0; i < MAX_BANDS; i++)
-	tb.bandmap[i] = 0;
-
-rule_distrib(node, &tb, 7);
 	
 	return node;
 }
@@ -238,8 +232,8 @@ void create_children(Trie* v)
 	v->children = (Trie *) calloc(MAX_CHILDREN, sizeof(Trie));
 
 	// assign each potential child its cut band values, then try to generate the child
-	for (val0 = 0; val0 < (1 << BAND_SIZE); val0++) {
-		for (val1 = 0; val1 < (1 << BAND_SIZE); val1++) {
+	for (val0 = 0; val0 < BAND_SIZE; val0++) {
+		for (val1 = 0; val1 < BAND_SIZE; val1++) {
 			new_child(v, tb0, tb1, val0, val1);
 		}
 	}
@@ -267,6 +261,7 @@ Trie* build_trie(Rule *rules, int nrules)
 	while (!queue_empty()) {
 		v = dequeue();
 		create_children(v);
+dump_node(v, 1);
 		for (i = 0; i < v->nchildren; i++) {
 			//if (v->children[i]->type == NONLEAF)
 			if ((v->children[i].type == NONLEAF) && (v->children[i].layer <= 3))

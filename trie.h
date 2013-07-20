@@ -4,7 +4,7 @@
 #include "bitband.h"
 #include "rule.h"
 
-#define MAX_CHILDREN	256		// BAND_SIZE * CUT_BANDS
+#define MAX_CHILDREN	256		// BAND_SIZE power2 CUT_BANDS
 #define LEAF_RULES		4		// upper limit on rules in lefa nodes
 
 

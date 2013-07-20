@@ -13,7 +13,7 @@ int field_bands[NFIELDS] = {8, 8, 4, 4, 2};
 inline
 int band_low(int band_id)
 {
-	return band_id * BAND_SIZE;
+	return band_id * BAND_BITS;
 }
 
 
@@ -22,7 +22,7 @@ int band_low(int band_id)
 inline
 int band_high(int band_id)
 {
-	return (band_id + 1) * BAND_SIZE - 1;
+	return (band_id + 1) * BAND_BITS - 1;
 }
 
 

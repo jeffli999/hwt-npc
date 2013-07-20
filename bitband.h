@@ -5,7 +5,8 @@
 #include "common.h"
 #include "rule.h"
 
-#define BAND_SIZE	4
+#define BAND_BITS	4
+#define BAND_SIZE	16	// power2 of BAND_BITS
 
 #define MAX_BANDS	8	// max #bands among sip, dip, sp, dp, prot
 #define	TOTAL_BANDS	26	// sum of bit-bands of a rule (sip + dip + sp + ...)
@@ -22,7 +23,7 @@ typedef struct {
 } Band;
 
 
-// Ternary bits in (BAND_SIZE) bit-bands, e.g., 0010****1101****
+// Ternary bits in (BAND_BITS) bit-bands, e.g., 0010****1101****
 typedef struct {
 	uint8_t		dim;		// dimension of the ternary bit string
 	uint8_t		nbands;		// reduandant to band_map, for efficiency purpose

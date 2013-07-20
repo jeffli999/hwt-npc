@@ -6,7 +6,7 @@
 
 
 void choose_bands(Trie *v, TBits *path_tbits);
-void rule_distrib(Trie *v, TBits *tb, int bid);
+void rule_distrib(Trie *v, TBits *tb, int bid, int *hwt);
 
 
 #endif
