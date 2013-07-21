@@ -285,10 +285,7 @@ void dump_node(Trie *v, int simple)
 		printf("d%d-b%d-v%x | ", v->bands[0].dim, v->bands[0].id, v->bands[0].val);
 		printf("d%d-b%d-v%x ", v->bands[1].dim, v->bands[1].id, v->bands[1].val);
 	}
-if (v->nrules > 4)
-	printf("\n*Rules: ");
-else
-	printf("\nRules: ");
+	printf("\tRules: ");
 	if (simple) {
 		printf("%d", v->nrules);
 	} else {
@@ -296,7 +293,7 @@ else
 			printf("%d, ", v->rules[i]->id);
 	}
 
-	printf("\nNodes: ");
+	printf("\tNodes: ");
 	if (simple) {
 		printf("%d", v->nchildren);
 	} else {
