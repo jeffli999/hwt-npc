@@ -6,17 +6,6 @@
 
 typedef uint8_t byte;
 
-typedef struct {
-	uint8_t		dim;
-	uint8_t		band;
-	uint8_t		dom;		// dominance - weighted ratio over hwt average (hwt[0])
-	uint16_t	dup;		// rule duplication ratio
-} Fitness;
-
-
-int	weight[BAND_SIZE] = {64, 48, 32, 32, 24, 24, 24, 24, 16, 16, 16, 16, 16, 16, 16, 16};
-#define	GOOD_FIT	4
-
 
 void *xmalloc(size_t amount)
 {
@@ -97,8 +86,46 @@ main(int argc, char **argv)
 */
 
 
+int	weight[BAND_SIZE] = {64, 48, 32, 32, 24, 24, 24, 24, 16, 16, 16, 16, 16, 16, 16, 16};
+#define	EVEN	4
 
-void rule_distrib(Trie *v, TBits *tb, int bid, int *hwt)
+typedef struct {
+	int		band;
+	int		even;		// evenness
+	int		dup;		// rule duplication ratio
+} Fitness;
+
+Fitness			fitness[NFIELDS];
+int				hwt[BAND_SIZE];
+
+
+// small value means more even, so the worst-case coeff represents the evenness
+inline
+int evenness(int nrules)
+{
+	int		i, even, e;
+
+	even = abs(hwt[1])*weight[1]/nrules;
+	for (i = 2; i < BAND_SIZE; i++) {
+		e = abs(hwt[i])*weight[i]/nrules;
+		if (e > even)
+			even = e;
+	}
+	return even;
+}
+
+
+
+inline
+int dup_ratio(int nrules)
+{
+	return (hwt[0]*BAND_SIZE*100) / nrules;
+}
+
+
+
+// divide rules into groups, and perform hwt for evenness and duplicaiton judgement
+void hwt_rules(Trie *v, TBits *tb, int bid)
 {
 	int		val, i, total = 0;
 
@@ -116,6 +143,8 @@ void rule_distrib(Trie *v, TBits *tb, int bid, int *hwt)
 
 	tb->nbands--;
 	tb->bandmap[bid] = 0;
+
+	do_hwt(hwt, BAND_SIZE);
 /*
 	for (i = 0; i < BAND_SIZE; i++)
 		printf("%d ", hwt[i]);
@@ -125,56 +154,76 @@ void rule_distrib(Trie *v, TBits *tb, int bid, int *hwt)
 
 
 
-int check_fitness(Trie *v, TBits *path_tbits, Fitness *fit, Fitness *fit1, int bid)
-{
-	int		hwt[BAND_SIZE];
-	int		i, dom = fit->dom, dom1, dup;
-
-	rule_distrib(v, path_tbits, bid, hwt);
-	do_hwt(hwt, BAND_SIZE);
-
-	// special handing for hwt[0], care about its duplication
-	dup = (hwt[0]*BAND_SIZE*100) / v->nrules;
-	i = dup < 240 ? 0 : 1;
-
-	for (; i < BAND_SIZE; i++) {
-		dom1 = abs(hwt[i])*weight[i]/v->nrules;
-		if (dom1 > dom)
-			dom = dom1;
-	}
-
-	if ((dom != fit->dom) || (fit->dom == 0)) {
-		*fit1 = *fit;
-		fit->band = bid;
-		fit->dom = dom;
-		fit->dup = (hwt[0]*BAND_SIZE*100) / v->nrules;
-	}
-}
-
-
-
-// TODO: now only consider fitness, duplication should be accounted latr
+// to check whether the combination of even and dup gets improved over previous round
 inline
-int good_fitness(Fitness *fit)
+int cut_improved(int even, int dup, int even1, int dup1)
 {
-	return (fit->dom < GOOD_FIT);
+	return (even1*dup1 < even*dup);
+}
+
+
+#define		DUP_THRESH	400
+
+// advance to lower bands till sharp rule duplication, remember the best band along the process
+int advance_dim(Trie *v, TBits *tb, int dim, int locked_bid)
+{
+	int		e, even = 255;				// 255 is an unreachable bad evenness
+	int		d, dup = BAND_SIZE * 100;	// dup ratio initialized to an unreachable bad one
+	int		bid, cut_bid;				// the selected band to cut
+
+	bid = free_band(tb, field_bands[dim] - 1);
+	if (bid == locked_bid)
+		bid = free_band(tb, bid - 1);
+	if (bid < 0)
+		return -1;
+	
+	cut_bid = bid;
+	while (bid >= 0) {
+		hwt_rules(v, tb, bid);
+		e = evenness(v->nrules);
+		d = dup_ratio(v->nrules);
+		// combine evenness and duplicatio for cut fitness judgement
+		if (cut_improved(even, dup, e, d)) {
+			even = e;
+			dup = d;
+			cut_bid = bid;
+		}
+		// stop at sharp duplication
+		if (d >= DUP_THRESH)
+			break;
+		bid = free_band(tb, bid - 1);
+		if (bid == locked_bid)
+			bid = free_band(tb, bid - 1);
+	}
+
+	fitness[dim].band = cut_bid;
+	fitness[dim].even = even;
+	fitness[dim].dup = dup;
+
+	return cut_bid;
 }
 
 
 
-int best_dim_band(Fitness *fits)
+// smaller is better, no weight for even or dup here
+int get_fitness(Fitness *fit)
 {
-	int i, dim = 0;
+	return fit->even*fit->dup;
+}
 
-	for (i = 1; i < NFIELDS; i++) {
-		if (fits[i].dup < fits[dim].dup)
+
+
+int choose_dim(int *bids)
+{
+	int		fit = 10000, fit1, i, dim;
+
+	for (i = 0; i < NFIELDS; i++) {
+		if (bids[i] < 0)
+			continue;
+		fit1 = get_fitness(&fitness[i]);
+		if (fit1 < fit) {
+			fit = fit1;
 			dim = i;
-	}
-
-	for (i = 1; i < NFIELDS; i++) {
-		if (fits[i].dom < fits[dim].dom) {
-			if (fits[i].dup <= fits[dim].dup * 1.2)
-				dim = i;
 		}
 	}
 	return dim;
@@ -182,60 +231,21 @@ int best_dim_band(Fitness *fits)
 
 
 
-void choose_bands(Trie *v, TBits *path_tbits)
+void choose_bands(Trie *v, TBits *path_tb)
 {
-	int			hwt[BAND_SIZE], bid[NFIELDS];
-	int			good[NFIELDS], num_good = 0, dim, i;
-	Fitness		fits[NFIELDS], fits1[NFIELDS];
+	int		bid[NFIELDS], dim, i;
 
-	for (i = 0; i < NFIELDS; i++) {
-		fits[i].dim = fits1[i].dim = i;
-		fits[i].dom = fits1[i].dom = 0;
-		bid[i] = free_band(&path_tbits[i], field_bands[i] - 1);
-		if (bid[i] < 0) {
-			good[i] = 1;
-			num_good++;
-			fits[i].dom = 0xff;
-		} else {
-			good[i] = 0;
-		}
-	}
+	for (i = 0; i < NFIELDS; i++)
+		bid[i] = advance_dim(v, &path_tb[i], i, -10);
 
-	while (num_good < NFIELDS) {
-		for (i = 0; i < NFIELDS; i++) {
-			if (good[i])
-				continue;
-			check_fitness(v, &path_tbits[i], &fits[i], &fits1[i], bid[i]);
-			bid[i] = free_band(&path_tbits[i], bid[i] - 1);
-			if (good_fitness(&fits[i]) || (bid[i] < 0)) {
-				good[i] = 1;
-				num_good++;
-			}
-		}
-	}
-
-	dim = best_dim_band(fits);
+	dim = choose_dim(bid);
 	v->cut_bands[0].dim = dim;
-	v->cut_bands[0].id = fits[dim].band;
-printf("dup=%d\n", fits[dim].dup);
+	v->cut_bands[0].id = fitness[dim].band;
 
-	if (fits1[dim].dom != 0) {
-		fits[dim] = fits1[dim];
-	} else {
-		fits[dim].dom = 0;
-		fits[dim].dup = BAND_SIZE*100;
-	}
-
-	bid[dim] = free_band(&path_tbits[dim], bid[dim] - 1);
-	while (bid[dim] >= 0) {
-		check_fitness(v, &path_tbits[dim], &fits[dim], &fits1[dim], bid[dim]);
-		bid[dim] = free_band(&path_tbits[dim], bid[dim] - 1);
-	}
-	dim = best_dim_band(fits);
+	bid[dim] = advance_dim(v, &path_tb[dim], dim, fitness[dim].band);
+	dim = choose_dim(bid);
 	v->cut_bands[1].dim = dim;
-	v->cut_bands[1].id = fits[dim].band;
-printf("dup=%d\n", fits[dim].dup);
+	v->cut_bands[1].id = fitness[dim].band;
 printf("choose_bands[%d]: dim0=%d, band0=%d\n", v->id, v->cut_bands[0].dim, v->cut_bands[0].id);
 printf("                  dim1=%d, band1=%d\n", v->cut_bands[1].dim, v->cut_bands[1].id);
-
 }

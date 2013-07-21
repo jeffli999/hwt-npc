@@ -12,7 +12,7 @@ Trie	**trie_nodes;
 int		trie_nodes_size = 10240;
 
 Trie**	queue;
-int		qhead, qtail, qsize = 1024;
+int		qhead, qtail, qsize = 102400;
 
 void dump_trie(Trie *root);
 void dump_node(Trie *v, int simple);
@@ -73,7 +73,7 @@ Trie* init_trie(Rule *rules, int nrules)
 	for (i = 0; i < nrules; i++)
 			node->rules[i] = &rules[i];
 
-	trie_nodes = (Trie **) malloc( 10240 * sizeof(Trie *));
+	trie_nodes = (Trie **) malloc(trie_nodes_size*sizeof(Trie *));
 	trie_nodes[0] = node;
 	
 	return node;
@@ -179,12 +179,11 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 	u->type = nrules > LEAF_RULES ? NONLEAF : LEAF;
 
 	v->nchildren++;
-
 	if (total_nodes >= trie_nodes_size) {
 		trie_nodes_size += 10240;
-		trie_nodes = realloc(trie_nodes, (trie_nodes_size + 10240) * sizeof(Trie *));
+		trie_nodes = realloc(trie_nodes, trie_nodes_size*sizeof(Trie *));
 	}
-	trie_nodes[total_nodes - 1] = u;
+	trie_nodes[total_nodes-1] = u;
 }
 
 
@@ -238,7 +237,7 @@ void create_children(Trie* v)
 		}
 	}
 
-	v->children = (Trie *) realloc(v->children, v->nchildren * sizeof(Trie));
+	v->children = (Trie *) realloc(v->children, v->nchildren*sizeof(Trie));
 
 	// recover path_tbits to the state before v's band cut
 	tb0->bandmap[band0->id] = 0;
