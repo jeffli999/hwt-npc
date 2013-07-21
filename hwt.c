@@ -35,11 +35,6 @@ void do_hwt(int *array, int size)
 			array[i + (count >> 1)] = diff[i];
 		}
 	}
-/*
-	for (i = 0; i < BAND_SIZE; i++)
-		printf("%d ", array[i]);
-	printf("\n");
-*/
 }
 
 
@@ -116,22 +111,16 @@ int evenness(int nrules)
 
 
 
-inline
-int dup_ratio(int nrules)
-{
-	return (hwt[0]*BAND_SIZE*100) / nrules;
-}
-
-
-
 // divide rules into groups, and perform hwt for evenness and duplicaiton judgement
-void hwt_rules(Trie *v, TBits *tb, int bid)
+// return the rule duplication ratio 
+int hwt_rules(Trie *v, TBits *tb, int bid, int *max)
 {
 	int		val, i, total = 0;
 
 	tb->nbands++;
 	tb->bandmap[bid] = 1;
 
+	*max = 0;
 	for (val = 0; val < BAND_SIZE; val++) {
 		hwt[val] = 0;
 		set_tbits(tb, bid, val);
@@ -139,17 +128,16 @@ void hwt_rules(Trie *v, TBits *tb, int bid)
 			if (rule_collide(v->rules[i], tb))
 				hwt[val]++;
 		}
+		total += hwt[val];
+		if (hwt[val] > *max)
+			*max = hwt[val];
 	}
-
 	tb->nbands--;
 	tb->bandmap[bid] = 0;
 
 	do_hwt(hwt, BAND_SIZE);
-/*
-	for (i = 0; i < BAND_SIZE; i++)
-		printf("%d ", hwt[i]);
-	printf("\n");
-*/
+	
+	return (total*100)/v->nrules;
 }
 
 
@@ -158,18 +146,18 @@ void hwt_rules(Trie *v, TBits *tb, int bid)
 inline
 int cut_improved(int even, int dup, int even1, int dup1)
 {
-	return (even1*dup1 < even*dup);
+	return ((even1+1)*dup1 < (even+1)*dup);
 }
 
 
 #define		DUP_THRESH	400
 
-// advance to lower bands till sharp rule duplication, remember the best band along the process
+// advance to lower bands and remember the best band along the process
 int advance_dim(Trie *v, TBits *tb, int dim, int locked_bid)
 {
 	int		e, even = 255;				// 255 is an unreachable bad evenness
 	int		d, dup = BAND_SIZE * 100;	// dup ratio initialized to an unreachable bad one
-	int		bid, cut_bid;				// the selected band to cut
+	int		bid, cut_bid, max;			// the selected band to cut
 
 	bid = free_band(tb, field_bands[dim] - 1);
 	if (bid == locked_bid)
@@ -179,18 +167,13 @@ int advance_dim(Trie *v, TBits *tb, int dim, int locked_bid)
 	
 	cut_bid = bid;
 	while (bid >= 0) {
-		hwt_rules(v, tb, bid);
-		e = evenness(v->nrules);
-		d = dup_ratio(v->nrules);
+		d = hwt_rules(v, tb, bid, &max);
+		e = (max <= LEAF_RULES) ? 0 :evenness(v->nrules);
 		// combine evenness and duplicatio for cut fitness judgement
 		if (cut_improved(even, dup, e, d)) {
-			even = e;
-			dup = d;
+			even = e; dup = d;
 			cut_bid = bid;
 		}
-		// stop at sharp duplication
-		if (d >= DUP_THRESH)
-			break;
 		bid = free_band(tb, bid - 1);
 		if (bid == locked_bid)
 			bid = free_band(tb, bid - 1);
@@ -208,7 +191,8 @@ int advance_dim(Trie *v, TBits *tb, int dim, int locked_bid)
 // smaller is better, no weight for even or dup here
 int get_fitness(Fitness *fit)
 {
-	return fit->even*fit->dup;
+	// sometimes even = 0, adding 1 to prevent picking high dup cut
+	return (fit->even+1)*fit->dup;
 }
 
 
@@ -246,6 +230,4 @@ void choose_bands(Trie *v, TBits *path_tb)
 	dim = choose_dim(bid);
 	v->cut_bands[1].dim = dim;
 	v->cut_bands[1].id = fitness[dim].band;
-printf("choose_bands[%d]: dim0=%d, band0=%d\n", v->id, v->cut_bands[0].dim, v->cut_bands[0].id);
-printf("                  dim1=%d, band1=%d\n", v->cut_bands[1].dim, v->cut_bands[1].id);
 }

@@ -91,7 +91,8 @@ void dump_rule(Rule *rule)
 	// dump SIP & DIP
 	for (i = 0; i < 2; i++) {
 		r = rule->field[i];
-		dump_ip(r.lo);
+		dump_ip_hex(r.lo);
+		//dump_ip(r.lo);
 		if (r.hi - r.lo == 0xffffffff)
 			printf("/0 ");
 		else

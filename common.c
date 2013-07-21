@@ -89,3 +89,12 @@ void dump_ip(unsigned int ip)
 	printf("%d", extract_bits(ip, 7, 0));
 }
 
+
+
+void dump_ip_hex(unsigned int ip)
+{
+	printf("%02x.", extract_bits(ip, 31, 24));
+	printf("%02x.", extract_bits(ip, 23, 16));
+	printf("%02x.", extract_bits(ip, 15, 8));
+	printf("%02x", extract_bits(ip, 7, 0));
+}

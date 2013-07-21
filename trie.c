@@ -260,10 +260,9 @@ Trie* build_trie(Rule *rules, int nrules)
 	while (!queue_empty()) {
 		v = dequeue();
 		create_children(v);
-dump_node(v, 1);
 		for (i = 0; i < v->nchildren; i++) {
 			//if (v->children[i]->type == NONLEAF)
-			if ((v->children[i].type == NONLEAF) && (v->children[i].layer <= 3))
+			if ((v->children[i].type == NONLEAF) && (v->children[i].layer < 3))
 				enqueue(&(v->children[i]));
 		}
 	}
@@ -313,6 +312,7 @@ void dump_trie(Trie *root)
 {
 	Trie	*v;
 	int		i;
+int		r8 = 0, r16 = 0, r32 = 0;
 
 	qhead = qtail = 0;
 
@@ -321,11 +321,16 @@ void dump_trie(Trie *root)
 		v = dequeue();
 		if (v->type == LEAF)
 			continue;
+if (v->nrules <= 8)
+	r8++;
+else if (v->nrules <= 16)
+	r16++;
 
 		dump_node(v, 1);
 		for (i = 0; i < v->nchildren; i++)
 			enqueue(&(v->children[i]));
 	}
+printf("<8: %d, <16: %d, <32: %d, all: %d\n", r8, r16, r32, total_nodes);
 }
 
 
