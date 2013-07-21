@@ -84,10 +84,32 @@ main(int argc, char **argv)
 int	weight[BAND_SIZE] = {64, 48, 32, 32, 24, 24, 24, 24, 16, 16, 16, 16, 16, 16, 16, 16};
 #define	EVEN	4
 
+#define MAX_EVEN	((BAND_SIZE >> 1) + 1)
+
+// lower triange meaningless, as bad eveness means lots of small rules and low duplicate
+int		fit_table[BAND_SIZE+1][MAX_EVEN] = {
+	{  0,   0,   0,   0,   0,   0,   0,   0,   0},
+	{  1,   2,   6,  11,  20,  49,  81, 102, 103},		// dup = 1
+	{  3,   4,   8,  12,  21,  50,  82, 104, 114},
+	{  5,   7,   9,  15,  23,  52,  83, 105, 128},
+	{ 10,  13,  14,  22,  25,  53,  84, 106, 128},
+	{ 16,  17,  18,  24,  30,  55,  89, 109, 128},
+	{ 26,  27,  28,  29,  39,  56,  90, 110, 128},
+	{ 31,  32,  33,  34,  44,  57,  91, 128, 128},
+	{ 35,  36,  37,  38,  45,  59,  92, 128, 128},		// dup = 8
+	{ 40,  41,  42,  43,  54,  60,  95, 128, 128},
+	{ 46,  47,  48,  51,  58,  70,  97, 128, 128},
+	{ 61,  62,  63,  68,  69,  73,  98, 128, 128},
+	{ 65,  66,  67,  71,  72,  74,  99, 128, 128},
+	{ 75,  76,  77,  78,  79,  80, 100, 128, 128},
+	{ 85,  86,  87,  93,  94,  96, 101, 128, 128},
+	{107, 108, 109, 110, 111, 112, 114, 128, 128},
+	{128, 128, 128, 128, 128, 128, 128, 128, 128}
+};
+
 typedef struct {
 	int		band;
-	int		even;		// evenness
-	int		dup;		// rule duplication ratio
+	int		fit;
 } Fitness;
 
 Fitness			fitness[NFIELDS];
@@ -100,12 +122,14 @@ int evenness(int nrules)
 {
 	int		i, even, e;
 
-	even = abs(hwt[1])*weight[1]/nrules;
+	even = abs(hwt[1]);
 	for (i = 2; i < BAND_SIZE; i++) {
-		e = abs(hwt[i])*weight[i]/nrules;
+		e = abs(hwt[i]);
 		if (e > even)
 			even = e;
 	}
+
+	even = even*BAND_SIZE/nrules;
 	return even;
 }
 
@@ -113,14 +137,13 @@ int evenness(int nrules)
 
 // divide rules into groups, and perform hwt for evenness and duplicaiton judgement
 // return the rule duplication ratio 
-int hwt_rules(Trie *v, TBits *tb, int bid, int *max)
+int hwt_rules(Trie *v, TBits *tb, int bid)
 {
-	int		val, i, total = 0;
+	int		val, i, total = 0, dup, even, max = 0;
 
 	tb->nbands++;
 	tb->bandmap[bid] = 1;
 
-	*max = 0;
 	for (val = 0; val < BAND_SIZE; val++) {
 		hwt[val] = 0;
 		set_tbits(tb, bid, val);
@@ -129,35 +152,36 @@ int hwt_rules(Trie *v, TBits *tb, int bid, int *max)
 				hwt[val]++;
 		}
 		total += hwt[val];
-		if (hwt[val] > *max)
-			*max = hwt[val];
+		if (hwt[val] > max)
+			max = hwt[val];
 	}
 	tb->nbands--;
 	tb->bandmap[bid] = 0;
 
 	do_hwt(hwt, BAND_SIZE);
 	
-	return (total*100)/v->nrules;
+	dup = (total + (v->nrules >> 1) - 1)/v->nrules;
+	even = (max <= LEAF_RULES) ? 0 : evenness(total); 
+
+	return  fit_table[dup][even];
 }
 
 
 
 // to check whether the combination of even and dup gets improved over previous round
 inline
-int cut_improved(int even, int dup, int even1, int dup1)
+int better_fit(int even, int dup, int even1, int dup1)
 {
-	return ((even1+1)*dup1 < (even+1)*dup);
+	return fit_table[dup1][even1] < fit_table[dup][even];
 }
 
 
-#define		DUP_THRESH	400
 
 // advance to lower bands and remember the best band along the process
 int advance_dim(Trie *v, TBits *tb, int dim, int locked_bid)
 {
-	int		e, even = 255;				// 255 is an unreachable bad evenness
-	int		d, dup = BAND_SIZE * 100;	// dup ratio initialized to an unreachable bad one
-	int		bid, cut_bid, max;			// the selected band to cut
+	int		d, e, fit = 10000, fit1;
+	int		bid, cut_bid, max;
 
 	bid = free_band(tb, field_bands[dim] - 1);
 	if (bid == locked_bid)
@@ -167,11 +191,9 @@ int advance_dim(Trie *v, TBits *tb, int dim, int locked_bid)
 	
 	cut_bid = bid;
 	while (bid >= 0) {
-		d = hwt_rules(v, tb, bid, &max);
-		e = (max <= LEAF_RULES) ? 0 :evenness(v->nrules);
-		// combine evenness and duplicatio for cut fitness judgement
-		if (cut_improved(even, dup, e, d)) {
-			even = e; dup = d;
+		fit1 = hwt_rules(v, tb, bid);
+		if (fit1 < fit) {
+			fit = fit1;
 			cut_bid = bid;
 		}
 		bid = free_band(tb, bid - 1);
@@ -180,19 +202,9 @@ int advance_dim(Trie *v, TBits *tb, int dim, int locked_bid)
 	}
 
 	fitness[dim].band = cut_bid;
-	fitness[dim].even = even;
-	fitness[dim].dup = dup;
+	fitness[dim].fit = fit;
 
 	return cut_bid;
-}
-
-
-
-// smaller is better, no weight for even or dup here
-int get_fitness(Fitness *fit)
-{
-	// sometimes even = 0, adding 1 to prevent picking high dup cut
-	return (fit->even+1)*fit->dup;
 }
 
 
@@ -204,7 +216,7 @@ int choose_dim(int *bids)
 	for (i = 0; i < NFIELDS; i++) {
 		if (bids[i] < 0)
 			continue;
-		fit1 = get_fitness(&fitness[i]);
+		fit1 = fitness[i].fit;
 		if (fit1 < fit) {
 			fit = fit1;
 			dim = i;
