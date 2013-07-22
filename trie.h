@@ -13,19 +13,20 @@ enum { LEAF, NONLEAF };
 typedef struct trie_t	Trie;
 
 struct trie_t {
-	int		layer;
-	int		id;
-	int		type;
-	Trie*	parent;
-	Band	bands[CUT_BANDS];		// cut bands from parent
+	uint8_t		layer;
+	uint8_t		type;
+	uint16_t	nequals;			// number of equal nodes pointing to me
+	int			id;
+	int			nrules;
+	Rule**		rules;
 
-	int		nrules;
-	Rule**	rules;
+	Trie*		parent;
+	Band		bands[CUT_BANDS];	// cut bands from parent
 
-	Band	cut_bands[CUT_BANDS];	// cuts bands for generating children (no specific val field)
-	int		nchildren;
-	Trie*	children;
-	uint8_t	bandmap[MAX_CHILDREN];	// if nchildren < 256, 255 means empty child node
+	Band		cut_bands[CUT_BANDS];	// cuts bands for generating children (val meaningless)
+	int			nchildren;
+	Trie*		children;
+	uint8_t		bandmap[MAX_CHILDREN];	// if nchildren < 256, 255 means empty child node
 };
 
 

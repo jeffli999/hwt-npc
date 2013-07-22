@@ -81,8 +81,6 @@ main(int argc, char **argv)
 */
 
 
-int	weight[BAND_SIZE] = {64, 48, 32, 32, 24, 24, 24, 24, 16, 16, 16, 16, 16, 16, 16, 16};
-#define	EVEN	4
 
 #define MAX_EVEN	((BAND_SIZE >> 1) + 1)
 
@@ -129,7 +127,7 @@ int evenness(int nrules)
 			even = e;
 	}
 
-	even = even*BAND_SIZE/nrules;
+	even = (even*BAND_SIZE + (nrules >> 1) - 1)/nrules;
 	return even;
 }
 
