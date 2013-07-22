@@ -182,6 +182,8 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 	for (i = 0; i < v->nrules; i++) {
 		if (rule_collide(v->rules[i], tb0) && rule_collide(v->rules[i], tb1))
 			ruleset[nrules++] = v->rules[i];
+		else
+			printf("nocollide:v[%d], rule[%d]\n", v->id, i);
 	}
 	if (nrules == 0) {
 		free(ruleset);
@@ -213,6 +215,7 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 		trie_nodes = realloc(trie_nodes, trie_nodes_size*sizeof(Trie *));
 	}
 	trie_nodes[total_nodes-1] = u;
+printf("node[%d]@%d: %d rules\n", u->id, u->layer, u->nrules);
 }
 
 
@@ -291,8 +294,7 @@ Trie* build_trie(Rule *rules, int nrules)
 		v = dequeue();
 		create_children(v);
 		for (i = 0; i < v->nchildren; i++) {
-			//if (v->children[i]->type == NONLEAF)
-			if ((v->children[i].type == NONLEAF) && (v->children[i].layer < 3))
+			if ((v->children[i].type == NONLEAF) && (v->layer < 3))
 				enqueue(&(v->children[i]));
 		}
 	}
@@ -443,4 +445,14 @@ void dump_rules(Rule **rules, int nrules)
 void dump_node_rules(Trie *v)
 {
 	dump_rules(v->rules, v->nrules);
+}
+
+
+
+void dump_path(Trie *v, int simple)
+{
+	while (v != trie_root) {
+		dump_node(v, simple);
+		v = v->parent;
+	}
 }

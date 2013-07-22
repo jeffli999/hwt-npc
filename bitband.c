@@ -27,118 +27,80 @@ int band_high(int band_id)
 
 
 
-// Corresponding to case 1/2 in find_bank(), i.e.
-//     +--------+
-//  p  | bank   |
-//     +--------+
-int bank_case1(TBits *tbits, int band_id, uint32_t *bank_lo)
+// add n to v starting from bid band, only * bands indicated by tbits are involved in adding
+// note n < BAND_SIZE, otherwise unpredictable result arises
+int tbits_add(TBits *tbits, int bid, int n, int *v)
 {
-	int			i, lo, hi;
+	int			lo, hi;
 	uint32_t	bits;
-	
-	// 1. set lower * bands to 0, and set non-* bands to tbits band
-	for (i = band_id; i >= 0; i--) {
-		lo = band_low(i);
-		hi = band_high(i);
-		if (tbits->bandmap[i]) {
-			bits = extract_bits(tbits->val, hi, lo);
-			set_bits(bank_lo, hi, lo, bits);
+
+	for (; bid < field_bands[tbits->dim]; bid++) {
+		if (tbits->bandmap[bid])
+			continue;
+		lo = band_low(bid); hi = band_high(bid);
+		bits = extract_bits(*v, hi, lo) + n;
+		n = 1;
+		if (bits >= BAND_SIZE) {
+			bits -= BAND_SIZE;
+			set_bits(v, hi, lo, bits);	// overflow on this band, proceed to higher * bands
 		} else {
-			clear_bits(bank_lo, hi, lo);
-		}
-	}
-
-	return 1;
-}
-
-
-
-// Corresponding to case 3 (or 4) in find_bank(), i.e.
-// +--------+        +--------+
-// | bank'  |  p     | bank   |
-// +--------+        +--------+
-int bank_case2(TBits *tbits, int band_id, uint32_t *bank_lo)
-{
-	int			i, lo, hi, len, found = 0;
-	uint32_t	bits;
-
-	// 1. add the higher * band by 1 to get the right bank
-	for (i = band_id + 1; i < field_bands[tbits->dim]; i++) {
-		if (tbits->bandmap[i])
-			continue;	// band of non-* bits
-		lo = band_low(i);
-		hi = band_high(i);
-		if (all_one(*bank_lo, hi, lo))
-			clear_bits(bank_lo, hi, lo);	// overflow, proceed to higher * bands
-		else {
-			*bank_lo += 1 << lo;	// no overflow, done
+			set_bits(v, hi, lo, bits); 	// no overflow, done
 			break;
 		}
 	}
-
-	if (i == field_bands[tbits->dim])
-		return 0;	// no existence of right bank
-	
-	// 2. set lower * bands to 0, and set non-* bands to tbits band
-	for (i = band_id; i >= 0; i--) {
-		lo = band_low(i);
-		hi = band_high(i);
-		if (tbits->bandmap[i]) {
-			bits = extract_bits(tbits->val, hi, lo);
-			set_bits(bank_lo, hi, lo, bits);
-		} else {
-			clear_bits(bank_lo, hi, lo);
-		}
-	}
-
-	return 1;
+	if (bid < field_bands[tbits->dim])
+		return 1;	
+	else
+		return 0;	// adding leads to overall overflow
 }
 
 
 
-// Among the space banks encoded by tbits, return the one containing or immediately right to point.
-// Note: bit bands in tbits must be ordered, e.g.,
-// with tbits:   0001-****-1010-**** encoding 16 4-bit space banks: 
-// 1. for point: 0001-1100-1000-1000, the bank is 0001-1100-1000-****, which is right to point
-// 2. for point: 0001-1100-1011-1000, the bank is 0001-1101-1010-****, which is also right to point,
-//    but the bank 0001-1100-1010-**** with *-bit bands setting to point's values is left to  point,
-//    which is not the bank that we desire. 
-// 3. for point: 0001-1100-1010-1000, the bank is 0001-1100-1010-****, which contains point
-// For case 2, sometimes we may not find a right bank, e.g,
-// 4. for point: 0001-1111-1011-1000, no bank is found no matter what values are set for * bits
-int find_bank(uint32_t point, TBits *tbits, uint32_t *bank_lo)
+// Given a point and a set of space banks specified by tbits: return the left border of the bank
+// colliding with point or right to it, it might fail to find such a bank
+int bank_left_border(uint32_t point, TBits *tbits, uint32_t *lborder)
 {
 	uint32_t	bits1, bits2;
 	int			i, lo, hi, last_band, nbands = 0, found = 0;
 
-	*bank_lo = point;
-	for (i = field_bands[tbits->dim] - 1; (i >= 0) && (nbands < tbits->nbands); i--) {
+	*lborder = point;
+	for (i = field_bands[tbits->dim]-1; i >= 0; i--) {
+		if (nbands >= tbits->nbands)
+			break;
 		if (!tbits->bandmap[i])
 			continue;	// band of * bits
-
-		lo = band_low(i);
-		hi = band_high(i);
+		nbands++;
+		lo = band_low(i); hi = band_high(i);
 		bits1 = extract_bits(point, hi, lo);
 		bits2 = extract_bits(tbits->val, hi, lo);
-		if (bits1 < bits2) { 		// case 1: point on the left of current bank
-			found = bank_case1(tbits, i, bank_lo);
-			break;
-		} else if (bits1 > bits2) { // case 2: point on the right of current bank
-			found = bank_case2(tbits, i, bank_lo);
-			break;
+		if (bits1 == bits2)
+			continue;
+
+		// following code for point not colliding with any bank
+
+		if (bits1 > bits2) {
+			if (!tbits_add(tbits, i+1, 1, lborder))
+				return 0;
 		}
-		nbands++;
-		last_band = i;
+
+		// handle lower bit bands
+		i--;
+		for (; i >= 0; i--) {
+			lo = band_low(i); hi = band_high(i);
+			if (tbits->bandmap[i]) {
+				bits1 = extract_bits(tbits->val, hi, lo);
+				set_bits(lborder, hi, lo, bits1);
+			} else {
+				clear_bits(lborder, hi, lo);
+			}
+		}
+		return 1;
 	}
 
-	if (nbands == tbits->nbands) { 	// case 3: point inside current bank
-		if (last_band > 0) {
-			hi = band_low(last_band) - 1;
-			clear_bits(bank_lo, hi, 0);
-		}
-		found = 1;
-	}
-	return found;
+	// point colliding with a bank
+	hi = band_low(i) - 1;
+	clear_bits(lborder, hi, 0);
+	return 1;
 }
 
 
@@ -148,13 +110,9 @@ int range_overlap_tbits(Range *range, TBits *tbits)
 {
 	Range	bank;
 
-	if (!find_bank(range->lo, tbits, &(bank.lo)))
+	if (!bank_left_border(range->lo, tbits, &bank.lo))
 		return 0;
-//printf("range: [%x, %x], bank.lo: %x\n", range->lo, range->hi, bank.lo);
-//printf("1\n");
-	if (range->hi >= bank.lo)
-		return 1;
-	return 0;
+	return (range->hi >= bank.lo) ? 1 : 0;
 }
 
 
