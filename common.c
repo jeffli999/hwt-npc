@@ -22,6 +22,7 @@ uint32_t extract_bits(uint32_t a, int hi, int lo)
 
 
 
+// clear bits with 0
 inline
 void clear_bits(uint32_t *a, int hi, int lo)
 {
@@ -30,6 +31,19 @@ void clear_bits(uint32_t *a, int hi, int lo)
 
 	mask = ((1 << len) - 1) << lo;
 	*a = *a & (~mask);
+}
+
+
+
+// fill bits with 1
+inline
+void fill_bits(uint32_t *a, int hi, int lo)
+{
+	int			len = hi - lo + 1;
+	uint32_t	mask;
+
+	mask = ((1 << len) - 1) << lo;
+	*a = *a | mask;
 }
 
 

@@ -47,7 +47,7 @@ void test_band()
 	tbits.bandmap[1] = 1;
 	tbits.val = 0x0000;
 
-	result = range_overlap_tbits(&range, &tbits);
+	result = range_tbits_overlap(&range, &tbits);
 
 	if (result == 1)
 		printf("Overlap\n");

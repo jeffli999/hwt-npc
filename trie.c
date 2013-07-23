@@ -113,13 +113,13 @@ void form_path_tbits(Trie* v, TBits* path_tbits)
 		p = &path_tbits[v->bands[0].dim];
 		p->nbands++;
 		p->bandmap[i] = 1;
-		set_bits(&p->val, band_high(i), band_low(i), v->bands[0].val);
+		set_bits(&p->val, band_msb(i), band_lsb(i), v->bands[0].val);
 
 		i = v->bands[1].id;
 		p = &path_tbits[v->bands[1].dim];
 		p->nbands++;
 		p->bandmap[i] = 1;
-		set_bits(&p->val, band_high(i), band_low(i), v->bands[1].val);
+		set_bits(&p->val, band_msb(i), band_lsb(i), v->bands[1].val);
 
 		v = v->parent;
 	}
@@ -130,7 +130,7 @@ void form_path_tbits(Trie* v, TBits* path_tbits)
 inline
 void set_tbits(TBits *tb, uint32_t band_id, uint32_t val)
 {
-	set_bits(&tb->val, band_high(band_id), band_low(band_id), val);
+	set_bits(&tb->val, band_msb(band_id), band_lsb(band_id), val);
 }
 
 
@@ -138,7 +138,7 @@ void set_tbits(TBits *tb, uint32_t band_id, uint32_t val)
 inline
 int rule_collide(Rule *rule, TBits *tb)
 {
-	return range_overlap_tbits(&rule->field[tb->dim], tb);
+	return range_tbits_overlap(&rule->field[tb->dim], tb);
 }
 
 
@@ -182,8 +182,8 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 	for (i = 0; i < v->nrules; i++) {
 		if (rule_collide(v->rules[i], tb0) && rule_collide(v->rules[i], tb1))
 			ruleset[nrules++] = v->rules[i];
-		else
-			printf("nocollide:v[%d], rule[%d]\n", v->id, i);
+		//else
+		//	printf("nocollide:v[%d], rule[%d]\n", v->id, i);
 	}
 	if (nrules == 0) {
 		free(ruleset);
@@ -240,11 +240,11 @@ void create_children(Trie* v)
 		dim = v->bands[0].dim;
 		id = v->bands[0].id;
 		val0 = v->bands[0].val;
-		set_bits(&(path_tbits[dim].val), band_high(id), band_low(id), val0);
+		set_bits(&(path_tbits[dim].val), band_msb(id), band_lsb(id), val0);
 		dim = v->bands[1].dim;
 		id = v->bands[1].id;
 		val0 = v->bands[1].val;
-		set_bits(&(path_tbits[dim].val), band_high(id), band_low(id), val0);
+		set_bits(&(path_tbits[dim].val), band_msb(id), band_lsb(id), val0);
 	}
 
 	choose_bands(v, path_tbits);
@@ -297,6 +297,8 @@ Trie* build_trie(Rule *rules, int nrules)
 			if ((v->children[i].type == NONLEAF) && (v->layer < 3))
 				enqueue(&(v->children[i]));
 		}
+		if (total_nodes > 1000)
+			break;
 	}
 	printf("Trie nodes: %d\n", total_nodes);
 	dump_trie(trie_root);
@@ -324,7 +326,7 @@ void dump_node(Trie *v, int simple)
 		printf("d%d-b%d-v%x | ", v->bands[0].dim, v->bands[0].id, v->bands[0].val);
 		printf("d%d-b%d-v%x ", v->bands[1].dim, v->bands[1].id, v->bands[1].val);
 	}
-	printf("\tRules: ");
+	printf("\tRules{%d}: ", v->nrules);
 	if (simple) {
 		printf("%d", v->nrules);
 	} else {
@@ -332,7 +334,7 @@ void dump_node(Trie *v, int simple)
 			printf("%d, ", v->rules[i]->id);
 	}
 
-	printf("\tNodes: ");
+	printf("\nNodes{%d}: ", v->nchildren);
 	if (simple) {
 		printf("%d", v->nchildren);
 	} else {
@@ -418,7 +420,7 @@ void dump_trie(Trie *root)
 		if (v->type == LEAF)
 			continue;
 
-		dump_node(v, 1);
+		dump_node(v, 0);
 		for (i = 0; i < v->nchildren; i++)
 			enqueue(&(v->children[i]));
 	}
