@@ -2,12 +2,22 @@
 #include "common.h"
 
 
+inline
 int range_overlap(Range a, Range b)
 {
 	if (a.lo <= b.lo)
 		return (a.hi >= b.lo);
 	else
 		return (b.hi >= a.lo);
+}
+
+
+
+// check whether a covers b, but not vice versa
+inline
+int range_cover(Range a, Range b)
+{
+	return ((a.lo <= b.lo) && (a.hi >= b.hi));
 }
 
 
