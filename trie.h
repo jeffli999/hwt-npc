@@ -32,6 +32,11 @@ struct trie_t {
 
 Trie* build_trie(Rule *rules, int nrules);
 void dum_trie();
+void dump_trie(Trie *root);
+void dump_node(Trie *v, int simple);
+void dump_node_rules(Trie *v);
+void check_small_rules(int size);
+void dump_nodes(int size);
 
 
 #endif

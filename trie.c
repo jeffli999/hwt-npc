@@ -18,10 +18,6 @@ Range	**rule_covers;
 Rule	**tmp_rulesets[TMP_NRULES];
 
 
-void dump_trie(Trie *root);
-void dump_node(Trie *v, int simple);
-void dump_node_rules(Trie *v);
-
 
 void init_queue()
 {
@@ -153,9 +149,11 @@ int find_ruleset(Rule **ruleset, int nrules, int dim0, int dim1)
 
 	if (tmp_rulesets[nrules-1] == NULL)
 		found = 0;
-	else if (dim0 < 2 && dim1 < 2)	// IP prefix has special inclusion property
+	else if (nrules <= LEAF_RULES || (dim0 < 2 && dim1 < 2))
+		// reduandancy on leaf nodes or IP prefix can be simply checked by idential ruleset
 		found = memcmp(ruleset, tmp_rulesets[nrules-1], nrules*sizeof(Rule *)) == 0 ? 1 : 0;
-	else	// TODO: for range, any method to identify reduandant child?
+	else	
+		// TODO: for range, any method to identify reduandant child?
 		found = 0;
 	
 	if (!found)
@@ -199,49 +197,63 @@ int redundant_rule(Rule *rule, TBits *tb0, TBits *tb1, Range *cover)
 #define CHECK_RULE_REDUND	1
 
 
+// Add a rule if it is overlaps with territories of tb0 & tb1, and it is not reduandant with 
+// previous rules. return 1 if rule added, otherwise return 0
+inline
+int add_rule(Rule **ruleset, int nrules, Rule *rule, TBits *tb0, TBits *tb1)
+{
+	Range	*cover;
+	int		i;
+
+	if (!rule_collide(rule, tb0) || !rule_collide(rule, tb1))
+		return 0;
+
+#if CHECK_RULE_REDUND
+	// check rule redundancy
+	if (nrules <= 64) {
+		for (i = 0; i < nrules; i++) {
+			cover = rule_covers[ruleset[i]->id];
+			if (redundant_rule(rule, tb0, tb1, cover))
+				break;
+		}
+		if (i == nrules) {	// not redundant to any rule in v
+			ruleset[nrules] = rule;
+			// set rule[i]'s cover to rule_covers for checking later rules
+			cover = rule_covers[rule->id];
+			rule_cover(rule->field, tb0, cover);
+			rule_cover(rule->field, tb1, cover);
+			return 1;
+		} else
+			return 0;
+	} else {
+		ruleset[nrules] = rule;
+		return 1;
+	}
+#else
+		ruleset[nrules] = rule;
+		return 1;
+#endif
+}
+
+
 // identify rules that overlap with tb1 and tb2, and create a child if rules found
 void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 {
 	Trie		*u;
-	Rule		*rule, **ruleset;
-	int			nrules = 0, found, i, j;
+	Rule		**ruleset;
 	Band		*b0, *b1;
-	Range		*cover;
+	int			nrules = 0, found, i;
 
-	//printf("new_child[%d]@%d\n", total_nodes, v->layer+1);
 	b0 = &v->cut_bands[0];
 	b1 = &v->cut_bands[1];
 	set_tbits(tb0, b0->id, val0);
 	set_tbits(tb1, b1->id, val1);
 	ruleset = (Rule **) malloc(v->nrules * sizeof(Rule *));
 
-	// add rules that collide with tb0 & tb1, and not redundant to any higher priority rules in v
-	// in the territory of tb0 & tb1
+	// add rules
 	for (i = 0; i < v->nrules; i++) {
-		rule = v->rules[i];
-		if (!rule_collide(rule, tb0) || !rule_collide(rule, tb1))
-			continue;
-		// check rule redundancy
-#if CHECK_RULE_REDUND
-if (v->layer >= 0) {
-		for (j = 0; j < nrules; j++) {
-			cover = rule_covers[ruleset[j]->id];
-			if (redundant_rule(rule, tb0, tb1, cover))
-				break;
-		}
-		if (j == nrules) {	// not redundant to any rule in v
-			ruleset[nrules++] = v->rules[i];
-			// set rule[i]'s cover to rule_covers for checking later rules
-			cover = rule_covers[v->rules[i]->id];
-			rule_cover(rule->field, tb0, cover);
-			rule_cover(rule->field, tb1, cover);
-		}
-}
-else
-		ruleset[nrules++] = v->rules[i];
-#else
-		ruleset[nrules++] = v->rules[i];
-#endif
+		if (add_rule(ruleset, nrules, v->rules[i], tb0, tb1))
+			nrules++;
 	}
 
 	if (nrules == 0) {
@@ -359,14 +371,21 @@ Trie* build_trie(Rule *rules, int nrules)
 		v = dequeue();
 		create_children(v);
 		for (i = 0; i < v->nchildren; i++) {
-			if ((v->children[i].type == NONLEAF) && (v->layer <= 7))
+			//if ((v->children[i].type == NONLEAF) && (v->layer <= 8))
+			if (v->children[i].type == NONLEAF)
 				enqueue(&(v->children[i]));
 		}
 		//if (total_nodes > 1000)
 		//	break;
+		if (total_nodes > 500000) {
+			printf("Trie size: %d too large, refuse to work\n", total_nodes);
+			exit(1);
+		}
 	}
+dump_nodes(4);
+check_small_rules(8);
 	printf("Trie nodes: %d\n", total_nodes);
-	//dump_trie(trie_root);
+//dump_trie(trie_root);
 }
 
 
@@ -485,14 +504,14 @@ void dump_trie(Trie *root)
 		if (v->type == LEAF)
 			continue;
 
-		dump_node(v, 0);
+		dump_node(v, 1);
 		for (i = 0; i < v->nchildren; i++)
 			enqueue(&(v->children[i]));
 	}
 	printf("n8: %d/%d, n16: %d, total: %d\n", sn8, n8, n16, total_nodes);
-	check_small_rules(8);
-	check_small_rules(16);
-	small_large(16);
+	//check_small_rules(8);
+	//check_small_rules(16);
+	//small_large(16);
 }
 
 
@@ -521,5 +540,21 @@ void dump_path(Trie *v, int simple)
 	while (v != trie_root) {
 		dump_node(v, simple);
 		v = v->parent;
+	}
+}
+
+
+void dump_nodes(int size)
+{
+	int		i;
+
+	for (i = 0; i < total_nodes; i++) {
+		if (trie_nodes[i]->nrules <= size)
+			printf("N[%d<-%d#%d]@%d: #%d\n", 
+					trie_nodes[i]->id,
+					trie_nodes[i]->parent->id,
+					trie_nodes[i]->parent->nrules,
+					trie_nodes[i]->layer,
+					trie_nodes[i]->nrules);
 	}
 }
