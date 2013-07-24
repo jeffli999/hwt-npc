@@ -186,7 +186,8 @@ int redundant_rule(Rule *rule, TBits *tb0, TBits *tb1, Range *cover)
 	int		i;
 
 	rule_cover(rule->field, tb0, cover1);
-	rule_cover(cover1, tb1, cover1);
+	if (tb1 != NULL)
+		rule_cover(cover1, tb1, cover1);
 	for (i = 0; i < NFIELDS; i++) {
 		if (!range_cover(cover[i], cover1[i]))
 			return 0;
@@ -194,13 +195,12 @@ int redundant_rule(Rule *rule, TBits *tb0, TBits *tb1, Range *cover)
 	return 1;
 }
 
-#define CHECK_RULE_REDUND	1
 
 
 // Add a rule if it is overlaps with territories of tb0 & tb1, and it is not reduandant with 
 // previous rules. return 1 if rule added, otherwise return 0
 inline
-int add_rule(Rule **ruleset, int nrules, Rule *rule, TBits *tb0, TBits *tb1)
+int add_rule(Rule **ruleset, int nrules, Rule *rule, TBits *tb0, TBits *tb1, int check_redun)
 {
 	Range	*cover;
 	int		i;
@@ -208,8 +208,8 @@ int add_rule(Rule **ruleset, int nrules, Rule *rule, TBits *tb0, TBits *tb1)
 	if (!rule_collide(rule, tb0) || !rule_collide(rule, tb1))
 		return 0;
 
-#if CHECK_RULE_REDUND
 	// check rule redundancy
+	//if (check_redun) {
 	if (nrules <= 64) {
 		for (i = 0; i < nrules; i++) {
 			cover = rule_covers[ruleset[i]->id];
@@ -229,10 +229,6 @@ int add_rule(Rule **ruleset, int nrules, Rule *rule, TBits *tb0, TBits *tb1)
 		ruleset[nrules] = rule;
 		return 1;
 	}
-#else
-		ruleset[nrules] = rule;
-		return 1;
-#endif
 }
 
 
@@ -242,7 +238,7 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 	Trie		*u;
 	Rule		**ruleset;
 	Band		*b0, *b1;
-	int			nrules = 0, found, i;
+	int			nrules = 0, found, i, check_redun;
 
 	b0 = &v->cut_bands[0];
 	b1 = &v->cut_bands[1];
@@ -251,8 +247,9 @@ void new_child(Trie *v, TBits *tb0, TBits *tb1, uint32_t val0, uint32_t val1)
 	ruleset = (Rule **) malloc(v->nrules * sizeof(Rule *));
 
 	// add rules
+	check_redun = v->nrules <= 64 ? 1 : 0;
 	for (i = 0; i < v->nrules; i++) {
-		if (add_rule(ruleset, nrules, v->rules[i], tb0, tb1))
+		if (add_rule(ruleset, nrules, v->rules[i], tb0, tb1, check_redun))
 			nrules++;
 	}
 
@@ -382,7 +379,7 @@ Trie* build_trie(Rule *rules, int nrules)
 			exit(1);
 		}
 	}
-dump_nodes(4);
+dump_nodes(10000);
 check_small_rules(8);
 	printf("Trie nodes: %d\n", total_nodes);
 //dump_trie(trie_root);
@@ -548,7 +545,7 @@ void dump_nodes(int size)
 {
 	int		i;
 
-	for (i = 0; i < total_nodes; i++) {
+	for (i = 1; i < total_nodes; i++) {
 		if (trie_nodes[i]->nrules <= size)
 			printf("N[%d<-%d#%d]@%d: #%d\n", 
 					trie_nodes[i]->id,

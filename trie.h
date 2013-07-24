@@ -31,6 +31,8 @@ struct trie_t {
 
 
 Trie* build_trie(Rule *rules, int nrules);
+int redundant_rule(Rule *rule, TBits *tb0, TBits *tb1, Range *cover);
+
 void dum_trie();
 void dump_trie(Trie *root);
 void dump_node(Trie *v, int simple);

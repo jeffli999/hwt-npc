@@ -3,6 +3,7 @@
 #include <math.h>
 #include <inttypes.h>
 #include "hwt.h"
+#include "trie.h"
 
 typedef uint8_t byte;
 
@@ -81,6 +82,7 @@ main(int argc, char **argv)
 */
 
 
+extern Range	**rule_covers;
 
 #define MAX_EVEN	((BAND_SIZE >> 1) + 1)
 
@@ -135,9 +137,11 @@ int evenness(int nrules)
 
 // divide rules into groups, and perform hwt for evenness and duplicaiton judgement
 // return the rule duplication ratio 
-int hwt_rules(Trie *v, TBits *tb, int bid)
+int bcut_fit(Trie *v, TBits *tb, int bid)
 {
-	int		val, i, total = 0, dup, even, max = 0;
+	Rule	*hwt_rules[64], *rule;
+	Range	*cover;
+	int		val, total = 0, dup, even, max = 0, i, j;
 
 	tb->nbands++;
 	tb->bandmap[bid] = 1;
@@ -146,8 +150,28 @@ int hwt_rules(Trie *v, TBits *tb, int bid)
 		hwt[val] = 0;
 		set_tbits(tb, bid, val);
 		for (i = 0; i < v->nrules; i++) {
-			if (rule_collide(v->rules[i], tb))
+			rule = v->rules[i];
+			if (!rule_collide(rule, tb))
+				continue;
+			if (hwt[val] > 64) {
 				hwt[val]++;
+				continue;
+			}
+				
+			// check rule redundancy
+			for (j = 0; j < hwt[val]; j++) {
+				cover = rule_covers[hwt_rules[j]->id];
+				if (redundant_rule(rule, tb, NULL, cover))
+					break;
+			}
+			if (j == hwt[val]) {
+				// not redundant, record this rule and its cover for checking by later rules,
+				// and increase hwt[val] to count this rule in
+				hwt_rules[hwt[val]] = rule;
+				cover = rule_covers[rule->id];
+				rule_cover(rule->field, tb, cover);
+				hwt[val]++;
+			}
 		}
 		total += hwt[val];
 		if (hwt[val] > max)
@@ -189,7 +213,7 @@ int advance_dim(Trie *v, TBits *tb, int dim, int locked_bid)
 	
 	cut_bid = bid;
 	while (bid >= 0) {
-		fit1 = hwt_rules(v, tb, bid);
+		fit1 = bcut_fit(v, tb, bid);
 		if (fit1 < fit) {
 			fit = fit1;
 			cut_bid = bid;
