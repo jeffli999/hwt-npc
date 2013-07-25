@@ -278,7 +278,15 @@ if (fit > max_fit)
 
 
 
-void choose_bands(Trie *v, TBits *path_tb)
+// cut heuristic for small nodes
+void small_bcut(Trie *v, TBits *path_tb) 
+{
+}
+
+
+
+// cut heuristics based on hwt for large nodes
+void large_bcut(Trie *v, TBits *path_tb) 
 {
 	int		bid[NFIELDS], dim, i;
 
@@ -296,4 +304,17 @@ void choose_bands(Trie *v, TBits *path_tb)
 
 	add_tbits_band(path_tb, &v->cut_bands[0]);
 	add_tbits_band(path_tb, &v->cut_bands[1]);
+}
+
+
+#define SMALL_NODE	16
+
+void choose_bands(Trie *v, TBits *path_tb)
+{
+
+
+	if (v->nrules > SMALL_NODE)
+		large_bcut(v, path_tb);
+	else
+		small_bcut(v, path_tb);
 }
