@@ -5,6 +5,8 @@
 #include "hwt.h"
 #include "trie.h"
 
+#define SMALL_NODE	16
+
 typedef uint8_t byte;
 
 
@@ -157,12 +159,11 @@ int evenness(int nrules)
 
 
 // get the fitness of a cut
-int bcut_fit(Trie *v, TBits *path_tb, int dim, int bid)
+int big_cut_fit(Trie *v, TBits *path_tb, int dim, int bid)
 {
 	Rule	*hwt_rules[64], *rule;
 	Range	*cover;
 	int		val, total = 0, dup, even, max = 0, i, j;
-static int	counter = 0;
 
 	// change path_tb for computing the fit of a band cut
 	// and recover it afer done (no return is allowed in between)
@@ -217,11 +218,62 @@ static int	counter = 0;
 
 
 
-// to check whether the combination of even and dup gets improved over previous round
-inline
-int better_fit(int even, int dup, int even1, int dup1)
+// get the fitness of a cut
+int small_cut_fit(Rule *rules, int nrules, TBits *path_tb, int dim, int bid, Rule *tmp_rules)
 {
-	return fit_table[dup1][even1] < fit_table[dup][even];
+	Rule	*ruleset1[SMALL_NODE], *ruleset2[SMALL_NODE], *rule, **tmp_set, **max_set;
+	Range	*cover;
+	int		val, total = 0, dup, even, max = 0, i, j;
+
+	// change path_tb for computing the fit of a band cut
+	// and recover it afer done (no return is allowed in between)
+	path_tb[dim].nbands++;
+	path_tb[dim].bandmap[bid] = 1;
+
+	for (val = 0; val < BAND_SIZE; val++) {
+		hwt[val] = 0;
+		set_tbits(&path_tb[dim], bid, val);
+		for (i = 0; i < v->nrules; i++) {
+			rule = v->rules[i];
+			if (!rule_collide(rule, &path_tb[dim]))
+				continue;
+			if (hwt[val] >= 64) {
+				hwt[val]++;
+				continue;
+			}
+
+			// check rule redundancy only if < 64 previous rules (to reduce computation, so it is
+			// not an exhaustive redundancy removal, but does not affect correctness by including
+			// some redundant rules, and this tradefoff is expected to work pretty good in practice
+			for (j = 0; j < hwt[val]; j++) {
+				cover = rule_covers[hwt_rules[j]->id];
+				if (redundant_rule(rule, path_tb, cover))
+					break;
+			}
+			if (j == hwt[val]) {
+				// not redundant, record this rule and its cover for checking by later rules,
+				// and increase hwt[val] to count this rule in
+				hwt_rules[hwt[val]] = rule;
+				cover = rule_covers[rule->id];
+				rule_cover(rule->field, path_tb, cover);
+				hwt[val]++;
+			}
+		}
+		total += hwt[val];
+		if (hwt[val] > max)
+			max = hwt[val];
+	}
+
+	// recover path_tb, which wil be used again in future
+	path_tb[dim].nbands--;
+	path_tb[dim].bandmap[bid] = 0;
+
+	do_hwt(hwt, BAND_SIZE);
+	
+	dup = ((total << 1) + (v->nrules >> 1) - 1)/v->nrules;
+	even = (max <= LEAF_RULES) ? 0 : evenness(total); 
+
+	return  fit_table[dup][even];
 }
 
 
@@ -278,15 +330,55 @@ if (fit > max_fit)
 
 
 
-// cut heuristic for small nodes
-void small_bcut(Trie *v, TBits *path_tb) 
+void
+small_cut_fit(Rule **srcset, int nrules, TBits *path_tb, int *bid, int *workset)
 {
 }
 
 
 
-// cut heuristics based on hwt for large nodes
-void large_bcut(Trie *v, TBits *path_tb) 
+Rule	*small_set1[SMALL_NODE], *small_set2[SMALL_NODE];
+
+Rule **find_small_cut(Rule **rules, int nrules, TBits *path_tb, int *nrules_min, int *dim_min, int *bid_min)
+{
+	Rule	**workset = small_set1, **minset = small_set2, **tmp;
+	int		dim, bid, nrules;
+
+	*nrules_min = SMALL_NODE + 1;
+	for (dim = 0; dim < NFIELDS; dim++) {
+		bid = field_bands[dim];
+		if (bid < 0)
+			continue;
+
+		while ((bid = free_band(&path_tb[dim], bid-1)) >= 0) {
+			nrules = small_cut_fit(rules, nrules, path_tb, dim, bid, workset);
+			if (nrules < *nrules_min) {
+				*nrules_min = nrules; 
+				tmp = workset; workset = minset; minset = tmp;
+			}
+		}
+	}
+	return minset;
+}
+
+
+
+void bcut_small(Trie *v, TBits *path_tb)
+{
+	Rule	*p;
+	int		nrules, dim, bid;
+
+	p = find_small_cut(v->rules, v->nrules, path_tb, &nrules, &dim, &bid);
+	v->cut_bands[0].dim = dim;
+	v->cut_bands[0].band = bid;
+	p = find_small_cut(p, nrules, path_tb, &nrules, &dim, &bid);
+	v->cut_bands[1].dim = dim;
+	v->cut_bands[1].band = bid;
+}
+
+
+
+void bcut_large(Trie *v, TBits *path_tb)
 {
 	int		bid[NFIELDS], dim, i;
 
@@ -307,14 +399,12 @@ void large_bcut(Trie *v, TBits *path_tb)
 }
 
 
-#define SMALL_NODE	16
 
-void choose_bands(Trie *v, TBits *path_tb)
+// cut heuristics based on hwt for large nodes
+void choose_bands(Trie *v, TBits *path_tb) 
 {
-
-
 	if (v->nrules > SMALL_NODE)
-		large_bcut(v, path_tb);
+		bcut_large(v, path_tb);
 	else
-		small_bcut(v, path_tb);
+		bcut_small(v, path_tb);
 }
