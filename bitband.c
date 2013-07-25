@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "common.h"
 #include "bitband.h"
 
@@ -28,7 +29,7 @@ int band_msb(int band_id)
 
 
 // add n to v starting from bid band, only * bands indicated by tbits are involved in adding
-// note n < BAND_SIZE, otherwise unpredictable result arises
+// note n < BAND_SIZE, otherwise unpredictable result arises, return 0 when overlfow
 int tbits_add(TBits *tbits, int bid, int n, int *v)
 {
 	int			lo, hi;
@@ -239,15 +240,17 @@ void range_tbits_cover(Range *r, TBits *tbits)
 	uint32_t	border;
 
 	if (!point_in_bank(r->lo, tbits, &band)) {
-		if (!left_bank_right_border(r->lo, tbits, &border))
+		if (left_bank_right_border(r->lo, tbits, &border))
+			r->lo = border + 1;
+		else
 			border = tbits_border(tbits, 0);
-		r->lo = border + 1;
 	}
 
 	if (!point_in_bank(r->hi, tbits, &band)) {
-		if (!right_bank_left_border(r->hi, tbits, &border))
+		if (right_bank_left_border(r->hi, tbits, &border))
+			r->hi = border - 1;
+		else
 			border = tbits_border(tbits, 1);
-		r->hi = border - 1;
 	}
 }
 
@@ -266,3 +269,42 @@ int free_band(TBits *tbits, int curr_band)
 	return i;
 }
 
+
+
+inline
+void set_tbits(TBits *tb, uint32_t band_id, uint32_t val)
+{
+	set_bits(&tb->val, band_msb(band_id), band_lsb(band_id), val);
+}
+
+
+
+// add a band to the corresponding one in the TBit set
+inline
+void add_tbits_band(TBits *tb_set, Band *band)
+{
+	TBits	*tb = &tb_set[band->dim];
+
+	if (tb->bandmap[band->id] != 0) {
+		printf("Oops, the band to add already set in the tbits\n");
+		exit(1);
+	}
+	tb->nbands++;
+	tb->bandmap[band->id] = 1;
+	set_tbits(tb, band->id, band->val);
+}
+
+
+
+// set one band in tbits given by a band parameter
+inline
+void set_tbits_band(TBits *tb_set, Band *band)
+{
+	TBits	*tb = &tb_set[band->dim];
+
+	if (tb->bandmap[band->id] == 0) {
+		printf("Oops, the band wasn't set before, use set_tbits_band instead!\n");
+		exit(1);
+	}
+	set_tbits(tb, band->id, band->val);
+}

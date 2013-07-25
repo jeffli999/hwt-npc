@@ -32,9 +32,8 @@ typedef struct {
 } TBits;
 
 
-int find_bank(uint32_t point, TBits *tbits, uint32_t *bank);
 
-int range_overlap_tbits(Range *range, TBits *tbits);
+int range_tbits_overlap(Range *range, TBits *tbits);
 
 inline
 int free_band(TBits *tbits, int curr_band);
