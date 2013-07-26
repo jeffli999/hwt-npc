@@ -6,6 +6,7 @@
 
 #define MAX_CHILDREN	256		// BAND_SIZE power2 CUT_BANDS
 #define LEAF_RULES		4		// upper limit on rules in lefa nodes
+#define	SMALL_NODE		16		// node is small with rules less than this
 
 
 enum { LEAF, NONLEAF };
@@ -38,7 +39,7 @@ void dump_trie(Trie *root);
 void dump_node(Trie *v, int simple);
 void dump_node_rules(Trie *v);
 void check_small_rules(int size);
-void dump_nodes(int size);
+void dump_nodes(int max, int min);
 
 
 #endif

@@ -185,7 +185,7 @@ int add_rule(Rule **ruleset, int nrules, Rule *rule, TBits *path_tbits, Trie *v)
 		return 0;
 
 	// check rule redundancy
-	if (nrules <= 64) {
+	if (nrules <= TMP_NRULES) {
 		for (i = 0; i < nrules; i++) {
 			cover = rule_covers[ruleset[i]->id];
 			if (redundant_rule(rule, path_tbits, cover))
@@ -299,7 +299,7 @@ Trie* build_trie(Rule *rules, int nrules)
 
 	while (!queue_empty()) {
 		v = dequeue();
-		if (v->layer >= 7) {
+		if (v->layer >= 6) {
 			printf("Stop working: trie depth >= %d \n", v->layer);
 			break;
 		}
@@ -311,15 +311,15 @@ Trie* build_trie(Rule *rules, int nrules)
 		}
 		//if (total_nodes > 1000)
 		//	break;
-		if (total_nodes > 500000) {
+		if (total_nodes > 300000) {
 			printf("Stop working: too many trie nodes (%d)!\n", total_nodes);
 			break;
 		}
 	}
-dump_nodes(10000);
-check_small_rules(8);
+dump_nodes(16, 8);
+//check_small_rules(8);
 	printf("Trie nodes: %d\n", total_nodes);
-printf("max_fit: %d\n", max_fit);
+//printf("max_fit: %d\n", max_fit);
 //dump_trie(trie_root);
 }
 
@@ -479,12 +479,13 @@ void dump_path(Trie *v, int simple)
 }
 
 
-void dump_nodes(int size)
+void dump_nodes(int max, int min)
 {
-	int		i;
+	int		i, n;
 
 	for (i = 1; i < total_nodes; i++) {
-		if (trie_nodes[i]->nrules <= size)
+		n = trie_nodes[i]->nrules;
+		if ((n <= max) && (n >= min))
 			printf("N[%d<-%d#%d]@%d: #%d\n", 
 					trie_nodes[i]->id,
 					trie_nodes[i]->parent->id,

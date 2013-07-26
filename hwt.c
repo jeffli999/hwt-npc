@@ -2,16 +2,14 @@
 #include <stdlib.h>
 #include <math.h>
 #include <inttypes.h>
+#include <string.h>
 #include "hwt.h"
 #include "trie.h"
 
-#define SMALL_NODE	16
 
 typedef uint8_t byte;
 
-
 int		max_fit = 0;
-
 
 void *xmalloc(size_t amount)
 {
@@ -137,6 +135,7 @@ typedef struct {
 
 Fitness			fitness[NFIELDS];
 int				hwt[BAND_SIZE];
+Rule			*tmp_rules[SMALL_NODE];
 
 
 // small value means more even, so the worst-case coeff represents the evenness
@@ -161,7 +160,7 @@ int evenness(int nrules)
 // get the fitness of a cut
 int big_cut_fit(Trie *v, TBits *path_tb, int dim, int bid)
 {
-	Rule	*hwt_rules[64], *rule;
+	Rule	*rule;
 	Range	*cover;
 	int		val, total = 0, dup, even, max = 0, i, j;
 
@@ -177,83 +176,21 @@ int big_cut_fit(Trie *v, TBits *path_tb, int dim, int bid)
 			rule = v->rules[i];
 			if (!rule_collide(rule, &path_tb[dim]))
 				continue;
-			if (hwt[val] >= 64) {
+			if (hwt[val] >= SMALL_NODE) {
 				hwt[val]++;
 				continue;
 			}
 
-			// check rule redundancy only if < 64 previous rules (to reduce computation, so it is
-			// not an exhaustive redundancy removal, but does not affect correctness by including
-			// some redundant rules, and this tradefoff is expected to work pretty good in practice
+			// check rule redundancy only for a small number of rules to reduce computation
 			for (j = 0; j < hwt[val]; j++) {
-				cover = rule_covers[hwt_rules[j]->id];
+				cover = rule_covers[tmp_rules[j]->id];
 				if (redundant_rule(rule, path_tb, cover))
 					break;
 			}
 			if (j == hwt[val]) {
 				// not redundant, record this rule and its cover for checking by later rules,
 				// and increase hwt[val] to count this rule in
-				hwt_rules[hwt[val]] = rule;
-				cover = rule_covers[rule->id];
-				rule_cover(rule->field, path_tb, cover);
-				hwt[val]++;
-			}
-		}
-		total += hwt[val];
-		if (hwt[val] > max)
-			max = hwt[val];
-	}
-
-	// recover path_tb, which wil be used again in future
-	path_tb[dim].nbands--;
-	path_tb[dim].bandmap[bid] = 0;
-
-	do_hwt(hwt, BAND_SIZE);
-	
-	dup = ((total << 1) + (v->nrules >> 1) - 1)/v->nrules;
-	even = (max <= LEAF_RULES) ? 0 : evenness(total); 
-
-	return  fit_table[dup][even];
-}
-
-
-
-// get the fitness of a cut
-int small_cut_fit(Rule *rules, int nrules, TBits *path_tb, int dim, int bid, Rule *tmp_rules)
-{
-	Rule	*ruleset1[SMALL_NODE], *ruleset2[SMALL_NODE], *rule, **tmp_set, **max_set;
-	Range	*cover;
-	int		val, total = 0, dup, even, max = 0, i, j;
-
-	// change path_tb for computing the fit of a band cut
-	// and recover it afer done (no return is allowed in between)
-	path_tb[dim].nbands++;
-	path_tb[dim].bandmap[bid] = 1;
-
-	for (val = 0; val < BAND_SIZE; val++) {
-		hwt[val] = 0;
-		set_tbits(&path_tb[dim], bid, val);
-		for (i = 0; i < v->nrules; i++) {
-			rule = v->rules[i];
-			if (!rule_collide(rule, &path_tb[dim]))
-				continue;
-			if (hwt[val] >= 64) {
-				hwt[val]++;
-				continue;
-			}
-
-			// check rule redundancy only if < 64 previous rules (to reduce computation, so it is
-			// not an exhaustive redundancy removal, but does not affect correctness by including
-			// some redundant rules, and this tradefoff is expected to work pretty good in practice
-			for (j = 0; j < hwt[val]; j++) {
-				cover = rule_covers[hwt_rules[j]->id];
-				if (redundant_rule(rule, path_tb, cover))
-					break;
-			}
-			if (j == hwt[val]) {
-				// not redundant, record this rule and its cover for checking by later rules,
-				// and increase hwt[val] to count this rule in
-				hwt_rules[hwt[val]] = rule;
+				tmp_rules[hwt[val]] = rule;
 				cover = rule_covers[rule->id];
 				rule_cover(rule->field, path_tb, cover);
 				hwt[val]++;
@@ -279,27 +216,23 @@ int small_cut_fit(Rule *rules, int nrules, TBits *path_tb, int dim, int bid, Rul
 
 
 // advance to lower bands and remember the best band along the process
-int advance_dim(Trie *v, TBits *path_tb, int dim, int locked_bid)
+int advance_dim(Trie *v, TBits *path_tb, int dim)
 {
 	int		d, e, fit = 10000, fit1;
 	int		bid, cut_bid, max;
 
 	bid = free_band(&path_tb[dim], field_bands[dim] - 1);
-	if (bid == locked_bid)
-		bid = free_band(&path_tb[dim], bid - 1);
 	if (bid < 0)
 		return -1;
 	
 	cut_bid = bid;
 	while (bid >= 0) {
-		fit1 = bcut_fit(v, path_tb, dim, bid);
+		fit1 = big_cut_fit(v, path_tb, dim, bid);
 		if (fit1 < fit) {
 			fit = fit1;
 			cut_bid = bid;
 		}
 		bid = free_band(&path_tb[dim], bid - 1);
-		if (bid == locked_bid)
-			bid = free_band(&path_tb[dim], bid - 1);
 	}
 
 	fitness[dim].band = cut_bid;
@@ -330,50 +263,111 @@ if (fit > max_fit)
 
 
 
-void
-small_cut_fit(Rule **srcset, int nrules, TBits *path_tb, int *bid, int *workset)
+typedef struct {
+	int		dim;
+	int		bid;
+	int		nrules_all;
+	int		nrules_max;
+	int		candidate;	// one candidate rulset, one current best
+	Rule	*rules[2][SMALL_NODE];
+} SmallCut;
+
+
+
+void small_cut_fit(Rule **rules, int nrules, TBits *tb_set, int dim, int bid, SmallCut *cut)
 {
+	Range	*cover;
+	Rule	*rule;
+	int		val, total = 0, max = 0, i, j;
+
+	// change tb_set for computing the fit of a band cut
+	// and recover it afer done (no return is allowed in between)
+	tb_set[dim].nbands++;
+	tb_set[dim].bandmap[bid] = 1;
+
+	for (val = 0; val < BAND_SIZE; val++) {
+		hwt[val] = 0;
+		set_tbits(&tb_set[dim], bid, val);
+		for (i = 0; i < nrules; i++) {
+			rule = rules[i];
+			if (!rule_collide(rule, &tb_set[dim]))
+				continue;
+			// check rule redundancy
+			for (j = 0; j < hwt[val]; j++) {
+				cover = rule_covers[tmp_rules[j]->id];
+				if (redundant_rule(rule, tb_set, cover))
+					break;
+			}
+			if (j == hwt[val]) {
+				// not redundant, record this rule and its cover for checking by later rules,
+				// and increase hwt[val] to count this rule in
+				tmp_rules[hwt[val]] = rule;
+				cover = rule_covers[rule->id];
+				rule_cover(rule->field, tb_set, cover);
+				hwt[val]++;
+			}
+		}
+		total += hwt[val];
+		if (hwt[val] > max) {
+			max = hwt[val];
+			// this (dim, bid) cut may be better, as its max node is smaller/equal to earlier best
+			if (max <= cut->nrules_max)
+				memcpy(cut->rules[cut->candidate], tmp_rules, max*sizeof(Rule *));
+		}
+	}
+	// this (dim, bid) produces smaller children, so replace the earlier best
+	if ((max < cut->nrules_max) || ((max == cut->nrules_max) && (total > cut->nrules_all))) {
+		cut->dim = dim;
+		cut->bid = bid;
+		cut->nrules_max = max;
+		cut->nrules_all = total;
+		cut->candidate ^= 1;
+	}
+
+	// recover tb_set, which wil be used again in future
+	tb_set[dim].nbands--;
+	tb_set[dim].bandmap[bid] = 0;
 }
 
 
 
 Rule	*small_set1[SMALL_NODE], *small_set2[SMALL_NODE];
 
-Rule **find_small_cut(Rule **rules, int nrules, TBits *path_tb, int *nrules_min, int *dim_min, int *bid_min)
+void find_small_cut(Rule **rules, int nrules, TBits *tb_set, SmallCut *cut)
 {
-	Rule	**workset = small_set1, **minset = small_set2, **tmp;
-	int		dim, bid, nrules;
+	Rule	**p = small_set1;
+	int		dim, bid, nrules_cut, total, total_min = SMALL_NODE * BAND_SIZE;
 
-	*nrules_min = SMALL_NODE + 1;
+	cut->nrules_max = SMALL_NODE + 1;
+	cut->nrules_all = SMALL_NODE * BAND_SIZE;
+	cut->candidate = 1;
 	for (dim = 0; dim < NFIELDS; dim++) {
 		bid = field_bands[dim];
-		if (bid < 0)
-			continue;
-
-		while ((bid = free_band(&path_tb[dim], bid-1)) >= 0) {
-			nrules = small_cut_fit(rules, nrules, path_tb, dim, bid, workset);
-			if (nrules < *nrules_min) {
-				*nrules_min = nrules; 
-				tmp = workset; workset = minset; minset = tmp;
-			}
+		while ((bid = free_band(&tb_set[dim], bid-1)) >= 0) {
+			small_cut_fit(rules, nrules, tb_set, dim, bid, cut);
 		}
 	}
-	return minset;
 }
 
 
 
 void bcut_small(Trie *v, TBits *path_tb)
 {
-	Rule	*p;
-	int		nrules, dim, bid;
+	Rule		*rules[SMALL_NODE], **p;
+	int			nrules, dim, bid;
+	SmallCut	cut;
 
-	p = find_small_cut(v->rules, v->nrules, path_tb, &nrules, &dim, &bid);
-	v->cut_bands[0].dim = dim;
-	v->cut_bands[0].band = bid;
-	p = find_small_cut(p, nrules, path_tb, &nrules, &dim, &bid);
-	v->cut_bands[1].dim = dim;
-	v->cut_bands[1].band = bid;
+	find_small_cut(v->rules, v->nrules, path_tb, &cut);
+	v->cut_bands[0].dim = cut.dim;
+	v->cut_bands[0].id = cut.bid;
+	add_tbits_band(path_tb, &v->cut_bands[0]);
+
+	memcpy(rules, cut.rules[cut.candidate^1], cut.nrules_max*sizeof(Rule *));
+
+	find_small_cut(rules, cut.nrules_max, path_tb, &cut);
+	v->cut_bands[1].dim = cut.dim;
+	v->cut_bands[1].id = cut.bid;
+	add_tbits_band(path_tb, &v->cut_bands[1]);
 }
 
 
@@ -383,18 +377,17 @@ void bcut_large(Trie *v, TBits *path_tb)
 	int		bid[NFIELDS], dim, i;
 
 	for (i = 0; i < NFIELDS; i++)
-		bid[i] = advance_dim(v, path_tb, i, -10);
+		bid[i] = advance_dim(v, path_tb, i);
 
 	dim = choose_dim(bid);
 	v->cut_bands[0].dim = dim;
 	v->cut_bands[0].id = fitness[dim].band;
+	add_tbits_band(path_tb, &v->cut_bands[0]);
 
-	bid[dim] = advance_dim(v, path_tb, dim, fitness[dim].band);
+	bid[dim] = advance_dim(v, path_tb, dim);
 	dim = choose_dim(bid);
 	v->cut_bands[1].dim = dim;
 	v->cut_bands[1].id = fitness[dim].band;
-
-	add_tbits_band(path_tb, &v->cut_bands[0]);
 	add_tbits_band(path_tb, &v->cut_bands[1]);
 }
 
