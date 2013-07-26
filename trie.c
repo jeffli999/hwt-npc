@@ -17,6 +17,7 @@ Range	**rule_covers;
 
 #define	TMP_NRULES		64
 Rule	**tmp_rulesets[TMP_NRULES];
+uint8_t range_flags[2][TMP_NRULES];	// 0: all rules fully cover parent port borders
 
 
 
@@ -115,16 +116,24 @@ int rule_collide(Rule *rule, TBits *tb)
 // (not an exhaustive search, only the recent set with the same number of rules is checked)
 int find_ruleset(Rule **ruleset, int nrules, int dim0, int dim1)
 {
-	int			found;
+	int			found = 1;
+
+	if (dim0 == 2 || dim0 ==3) {
+		if (range_flags[dim0-2][nrules-1] == 0)
+			found = 0;
+	}
+	if (dim1 == 2 || dim1 ==3) {
+		if (range_flags[dim1-2][nrules-1] == 0)
+			found = 0;
+	}
 
 	if (tmp_rulesets[nrules-1] == NULL)
 		found = 0;
-	else if (nrules <= LEAF_RULES || (dim0 < 2 && dim1 < 2))
-		// reduandancy on leaf nodes or IP prefix can be simply checked by idential ruleset
+	
+	// reduandancy on leaf nodes or IP/prot prefix can be simply checked by idential ruleset
+	// port fileds need first check whether each rule in a child node fully covers parent range
+	if (found) 
 		found = memcmp(ruleset, tmp_rulesets[nrules-1], nrules*sizeof(Rule *)) == 0 ? 1 : 0;
-	else	
-		// TODO: for range, any method to identify reduandant child?
-		found = 0;
 	
 	if (!found)
 		tmp_rulesets[nrules-1] = ruleset;
@@ -207,10 +216,11 @@ int add_rule(Rule **ruleset, int nrules, Rule *rule, TBits *path_tbits, Trie *v)
 
 
 // identify rules that overlap with path_tbits, and create a child if rules found
-void new_child(Trie *v, TBits *path_tbits)
+void new_child(Trie *v, TBits *path_tbits, Range *parent_borders)
 {
 	Trie		*u;
-	int			nrules = 0, found, i;
+	int			nrules = 0, found, i, j, dim;
+	Range		tb_borders[2];
 
 	u = &v->children[v->nchildren];
 	u->rules = (Rule **) malloc(v->nrules * sizeof(Rule *));
@@ -251,6 +261,21 @@ void new_child(Trie *v, TBits *path_tbits)
 		trie_nodes = realloc(trie_nodes, trie_nodes_size*sizeof(Trie *));
 	}
 	trie_nodes[total_nodes-1] = u;
+	
+	// set range cover flags for judge of port-cut redundancy
+	for (i = 0; i < 2; i++) {
+		dim = v->cut_bands[i].dim;
+		if (dim == 2 || dim == 3) { 
+			range_flags[dim-2][nrules-1] = 1;
+			for (j = 0; j < nrules; j++) {
+				if (!range_cover(u->rules[j]->field[dim], parent_borders[i])) {
+					range_flags[dim-2][nrules-1] = 0;
+					break;
+				}
+			}
+		}
+	}
+
 //printf("\tnode[%d<-%d#%d]@%d: %d rules\n", u->id, v->id, v->nrules, u->layer, u->nrules);
 }
 
@@ -261,13 +286,22 @@ void create_children(Trie* v)
 {
 	TBits		path_tbits[NFIELDS];
 	uint32_t	val0, val1, bid, dim;
+	Range		tb_borders[2];
+
 //printf("create children[%d]\n", v->id);
 	get_path_tbits(v, path_tbits);
+	tb_borders[0].lo = tbits_border(&path_tbits[2], 0);
+	tb_borders[0].hi = tbits_border(&path_tbits[2], 1);
+	tb_borders[1].lo = tbits_border(&path_tbits[3], 0);
+	tb_borders[1].hi = tbits_border(&path_tbits[3], 1);
+
 	choose_bands(v, path_tbits);
 
 	v->children = (Trie *) calloc(MAX_CHILDREN, sizeof(Trie));
 	memset(tmp_rulesets, 0, TMP_NRULES*sizeof(Rule **));
-
+	memset(range_flags[0], 0, TMP_NRULES*sizeof(uint8_t));
+	memset(range_flags[1], 0, TMP_NRULES*sizeof(uint8_t));
+//printf("create_children %d\n", v->id);
 	// assign each potential child its cut band values, then try to generate the child
 	for (val0 = 0; val0 < BAND_SIZE; val0++) {
 		v->cut_bands[0].val = val0;
@@ -275,7 +309,7 @@ void create_children(Trie* v)
 		for (val1 = 0; val1 < BAND_SIZE; val1++) {
 			v->cut_bands[1].val = val1;
 			set_tbits_band(path_tbits, &v->cut_bands[1]);
-			new_child(v, path_tbits);
+			new_child(v, path_tbits, tb_borders);
 		}
 	}
 
@@ -482,15 +516,23 @@ void dump_path(Trie *v, int simple)
 void dump_nodes(int max, int min)
 {
 	int		i, n;
+	Trie	*v;
 
 	for (i = 1; i < total_nodes; i++) {
-		n = trie_nodes[i]->nrules;
-		if ((n <= max) && (n >= min))
-			printf("N[%d<-%d#%d]@%d: #%d\n", 
-					trie_nodes[i]->id,
-					trie_nodes[i]->parent->id,
-					trie_nodes[i]->parent->nrules,
-					trie_nodes[i]->layer,
-					trie_nodes[i]->nrules);
+		v = trie_nodes[i];
+		n = v->nrules;
+	//	if ((n <= max) && (n >= min))
+			printf("N[%d<-%d#%d]@%d: #%d  ", 
+					v->id, v->parent->id, v->parent->nrules, v->layer, v->nrules);
+
+			if ((v->layer >= 3 && v->nrules >= 16) ||
+				(v->layer >= 4 && v->nrules >= 8)  ||
+				(v->layer >= 6 && v->nrules >= 6))
+				printf("d%d-b%d-v%x | d%d-b%d-v%x", 
+						v->bands[0].dim, v->bands[0].id, v->bands[0].val,
+						v->bands[1].dim, v->bands[1].id, v->bands[1].val);
+
+			printf("\n");
+
 	}
 }

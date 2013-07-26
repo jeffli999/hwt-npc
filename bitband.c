@@ -205,7 +205,7 @@ inline
 uint32_t tbits_border(TBits *tbits, int side)
 {
 	int			i, hi, lo;
-	uint32_t	border, bits, side_bits;
+	uint32_t	border = 0, bits, side_bits;
 
 	side_bits = (side == 0) ? 0 : (BAND_SIZE-1);
 	for (i = field_bands[tbits->dim]-1; i >= 0; i--) {

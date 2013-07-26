@@ -94,15 +94,15 @@ void dump_rule(Rule *rule)
 		dump_ip_hex(r.lo);
 		//dump_ip(r.lo);
 		if (r.hi - r.lo == 0xffffffff)
-			printf("/0 ");
+			printf("/00  ");
 		else
-			printf("/%d ", 32-MSB(r.hi - r.lo + 1));
+			printf("/%02d  ", 32-MSB(r.hi - r.lo + 1));
 	}
 
 	// dump SP & DP
 	for (i = 2; i < 4; i++) {
 		r = rule->field[i];
-		printf("%d : %d", r.lo, r.hi);
+		printf("%04x : %04x  ", r.lo, r.hi);
 		printf(" ");
 	}
 
