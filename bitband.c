@@ -243,14 +243,14 @@ void range_tbits_cover(Range *r, TBits *tbits)
 		if (left_bank_right_border(r->lo, tbits, &border))
 			r->lo = border + 1;
 		else
-			border = tbits_border(tbits, 0);
+			r->lo = tbits_border(tbits, 0);
 	}
 
 	if (!point_in_bank(r->hi, tbits, &band)) {
 		if (right_bank_left_border(r->hi, tbits, &border))
 			r->hi = border - 1;
 		else
-			border = tbits_border(tbits, 1);
+			r->hi = tbits_border(tbits, 1);
 	}
 }
 
