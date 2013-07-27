@@ -68,57 +68,61 @@ Trie* dequeue()
 // section for handling redundant trie nodes
 // ============================================================================
 
-#define CHECK_NODES		4	// only check at most this number of nodes
-#define	CHECK_NRULES	64	// only check nodes with rules less than this
+#define REDT_NODES	4	// only check at most this number of nodes
+#define	REDT_SIZE	64	// only check nodes with rules less than this
 
 
 typedef struct {
-	int		head[REDT_NRULES], tail[REDT_NRULES];
-	Trie	*nodeset[REDT_NUM][REDT_NRULES];
-
-
+	int			head[REDT_NODES], tail[REDT_NODES];
+	Trie		*nodeset[REDT_SIZE][REDT_NODES];
+	Range		parent_sp, parent_dp;		// source/dest port range in parent
 } RedtNodes;
 
-int		check_heads[CHECK_NRULES], check_tails[CHECK_NRULES];
-Rule	**check_rulesets[CHECK_NODES][CHECK_NRULES];
-uint8_t range_flags[2][CHECK_NODES][CHECK_NRULES];	// 0: all rules fully cover parent port borders
 
-void reset_check_rules()
+RedtNodes	redt_nodes;
+
+
+
+
+
+
+// two situations to qulify a range for redundancy check
+// 1. it is a prefix in its parent space
+// 2. it  fully cover the space of this node
+int check_node_redund(Rule **rules, int nrules, Trie *parent, TBits *tb_set)
 {
-	int		i, j;
+	int				idx, dim0, dim1;
+	static Trie		*v = NULL;
+	static Range	parent_borders[2], borders[2];
+	Range			r;
 
-	for (i = 0; i < CHECK_NODES; i++) {
-		memset(check_rulesets[i], 0, CHECK_NRULES*sizeof(Rule **));
-		memset(range_flags[0][i], 0, CHECK_NRULES*sizeof(uint8_t));
-		memset(range_flags[1][i], 0, CHECK_NRULES*sizeof(uint8_t));
+	if (parent != v) {
+		v = parent;
+		dim0 = parent->cut_bands[0].dim;
+		dim1 = parent->cut_bands[1].dim;
 	}
-	// set to indicate the empty of nodes of various lengths
-	for (i = 0; i < CHECK_NRULES; i++) 
-		check_heads[i] = check_tails[i] = 0;
-}
+	borders[0] = tbits_range(&tb_set[2], 0);
+	borders[1] = tbits_range(&tb_set[3], 0);
 
-
-
-// if all rules cover the whole range of its parent, set the flag to 1 to indicate redundancy
-void set_range_cover(Rule **rules, int nrules, int dim, Range parent_border, int pos)
-{
-	int		i;
-
-	range_flags[dim-2][pos][nrules-1] = 1;
 	for (i = 0; i < nrules; i++) {
-		if (!range_cover(rules[i]->field[dim], parent_border)) {
-			range_flags[dim-2][pos][nrules-1] = 0;
-			break;
+		if (dim0 == 2 || dim0 == 3) {
+			r = rule->field[dim0];
+			r = range_sect(r, borders[dim0-2]);
+			if (!prefix_range(r))
+				return 0;
+		}
+		if (dim1 == 2 || dim1 == 3) {
+			r = rule->field[dim1];
+			r = range_sect(r, borders[dim1-2]);
+			if (!prefix_range(r))
+				return 0;
 		}
 	}
+	return 1;
 }
 
 
 
-// redundant trie node removal: try to find a ruleset in current children with limited effort
-// (not an exhaustive search, only the recent set with the same number of rules is checked)
-// reduandancy on leaf nodes or IP/prot prefix can be simply checked by idential ruleset
-// port fileds need first check whether each rule in a child node fully covers parent range
 int find_ruleset(Rule **ruleset, int nrules, int dim0, int dim1, Range *parent_borders)
 {
 	int			idx = nrules-1, i;
@@ -128,7 +132,6 @@ int find_ruleset(Rule **ruleset, int nrules, int dim0, int dim1, Range *parent_b
 			break;
 	}
 	return i;
-}
 }
 
 

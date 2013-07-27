@@ -21,6 +21,17 @@ int range_cover(Range a, Range b)
 }
 
 
+// return intersection of the two ranges
+inline
+Range range_sect(Range a, Range b)
+{
+	a.lo = (a.lo < b.lo) ? b.lo : a.lo;
+	a.hi = (a.hi > b.hi) ? b.hi : a.hi;
+
+	return a;
+}
+
+
 
 inline
 uint32_t extract_bits(uint32_t a, int hi, int lo)
@@ -90,6 +101,22 @@ int all_one(uint32_t a, int hi, int lo)
 	a = extract_bits(a, hi, lo);
 	b = (1 << (hi - lo + 1)) - 1;
 	return a == b ? 1 : 0;
+}
+
+
+
+// check whether a range is some prefix form
+inline
+int prefix_range(Range a)
+{
+	uint32_t	k;
+
+	k = a.hi - a.lo;
+	k = k & (k+1);
+	if (k == 0)
+		return 1;
+	else
+		return 0;
 }
 
 

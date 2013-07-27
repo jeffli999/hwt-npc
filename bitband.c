@@ -200,23 +200,26 @@ int left_bank_right_border(uint32_t point, TBits *tbits, uint32_t *border)
 
 
 
-// return the border of the space specified by tbits, side = 0 means left border
+// return the range of the space specified by tbits
 inline
-uint32_t tbits_border(TBits *tbits, int side)
+Range tbits_range(TBits *tbits)
 {
 	int			i, hi, lo;
 	uint32_t	border = 0, bits, side_bits;
+	uint32_t	range;
 
-	side_bits = (side == 0) ? 0 : (BAND_SIZE-1);
 	for (i = field_bands[tbits->dim]-1; i >= 0; i--) {
 		hi = band_msb(i); lo = band_lsb(i);
-		if (tbits->bandmap[i])
+		if (tbits->bandmap[i]) {
 			bits = extract_bits(tbits->val, hi, lo);
-		else
-			bits = side_bits;
-		set_bits(&border, hi, lo, bits);
+			set_bits(&range.lo, hi, lo, bits);
+			set_bits(&range.hi, hi, lo, bits);
+		} else {
+			set_bits(&range.lo, hi, lo, 0);
+			set_bits(&range.hi, hi, lo, (BAND_SIZE-1));
+		}
 	}
-	return border;
+	return range;
 }
 
 
