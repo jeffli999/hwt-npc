@@ -135,7 +135,9 @@ typedef struct {
 
 Fitness			fitness[NFIELDS];
 int				hwt[BAND_SIZE];
-Rule			*tmp_rules[SMALL_NODE];
+
+#define	RULE_REDUNDANT_NUM	64
+Rule			*tmp_rules[RULE_REDUNDANT_NUM];
 
 
 // small value means more even, so the worst-case coeff represents the evenness
@@ -176,7 +178,7 @@ int big_cut_fit(Trie *v, TBits *path_tb, int dim, int bid)
 			rule = v->rules[i];
 			if (!rule_collide(rule, &path_tb[dim]))
 				continue;
-			if (hwt[val] >= SMALL_NODE) {
+			if (hwt[val] >= RULE_REDUNDANT_NUM) {
 				hwt[val]++;
 				continue;
 			}
@@ -331,12 +333,9 @@ void small_cut_fit(Rule **rules, int nrules, TBits *tb_set, int dim, int bid, Sm
 
 
 
-Rule	*small_set1[SMALL_NODE], *small_set2[SMALL_NODE];
-
 void find_small_cut(Rule **rules, int nrules, TBits *tb_set, SmallCut *cut)
 {
-	Rule	**p = small_set1;
-	int		dim, bid, nrules_cut, total, total_min = SMALL_NODE * BAND_SIZE;
+	int		dim, bid, nrules_cut, total, total_min = SMALL_NODE*BAND_SIZE;
 
 	cut->nrules_max = SMALL_NODE + 1;
 	cut->nrules_all = SMALL_NODE * BAND_SIZE;
@@ -353,7 +352,7 @@ void find_small_cut(Rule **rules, int nrules, TBits *tb_set, SmallCut *cut)
 
 void bcut_small(Trie *v, TBits *path_tb)
 {
-	Rule		*rules[SMALL_NODE], **p;
+	Rule		*rules[SMALL_NODE];
 	int			nrules, dim, bid;
 	SmallCut	cut;
 

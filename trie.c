@@ -15,11 +15,11 @@ int		qhead, qtail, qsize = 102400;
 
 Range	**rule_covers;
 
-#define	TMP_NRULES		64
-Rule	**tmp_rulesets[TMP_NRULES];
-uint8_t range_flags[2][TMP_NRULES];	// 0: all rules fully cover parent port borders
 
 
+// ============================================================================
+// section for queue related operations
+// ============================================================================
 
 void init_queue()
 {
@@ -64,6 +64,159 @@ Trie* dequeue()
 
 
 
+// ============================================================================
+// section for handling redundant trie nodes
+// ============================================================================
+
+#define CHECK_NODES		4	// only check at most this number of nodes
+#define	CHECK_NRULES	64	// only check nodes with rules less than this
+
+
+typedef struct {
+	int		head[REDT_NRULES], tail[REDT_NRULES];
+	Trie	*nodeset[REDT_NUM][REDT_NRULES];
+
+
+} RedtNodes;
+
+int		check_heads[CHECK_NRULES], check_tails[CHECK_NRULES];
+Rule	**check_rulesets[CHECK_NODES][CHECK_NRULES];
+uint8_t range_flags[2][CHECK_NODES][CHECK_NRULES];	// 0: all rules fully cover parent port borders
+
+void reset_check_rules()
+{
+	int		i, j;
+
+	for (i = 0; i < CHECK_NODES; i++) {
+		memset(check_rulesets[i], 0, CHECK_NRULES*sizeof(Rule **));
+		memset(range_flags[0][i], 0, CHECK_NRULES*sizeof(uint8_t));
+		memset(range_flags[1][i], 0, CHECK_NRULES*sizeof(uint8_t));
+	}
+	// set to indicate the empty of nodes of various lengths
+	for (i = 0; i < CHECK_NRULES; i++) 
+		check_heads[i] = check_tails[i] = 0;
+}
+
+
+
+// if all rules cover the whole range of its parent, set the flag to 1 to indicate redundancy
+void set_range_cover(Rule **rules, int nrules, int dim, Range parent_border, int pos)
+{
+	int		i;
+
+	range_flags[dim-2][pos][nrules-1] = 1;
+	for (i = 0; i < nrules; i++) {
+		if (!range_cover(rules[i]->field[dim], parent_border)) {
+			range_flags[dim-2][pos][nrules-1] = 0;
+			break;
+		}
+	}
+}
+
+
+
+// redundant trie node removal: try to find a ruleset in current children with limited effort
+// (not an exhaustive search, only the recent set with the same number of rules is checked)
+// reduandancy on leaf nodes or IP/prot prefix can be simply checked by idential ruleset
+// port fileds need first check whether each rule in a child node fully covers parent range
+int find_ruleset(Rule **ruleset, int nrules, int dim0, int dim1, Range *parent_borders)
+{
+	int			idx = nrules-1, i;
+	
+	for (i = check_tails[idx]; i != check_heads[idx]; i = (i+1) % CHECK_NODES) {
+		if (memcmp(ruleset, check_rulesets[i][idx], nrules*sizeof(Rule *)) == 0)
+			break;
+	}
+	return i;
+}
+}
+
+
+
+// if node is not redundant, need to include it in the check set for checking following nodes
+void check_node_redundancy(Rule **ruleset, int nrules, int dim0, int dim1, Range *parent_borders)
+{
+	int		idx = nrules-1, pos;
+
+	pos = find_ruleset(ruleset, nrules, dim0, dim1, parent_borders);
+
+	if (dim0 == 2 || dim0 == 3) {
+		if (range_flags[dim0-2][i][idx] == 0)
+			return 0;
+	}
+	if (dim1 == 2 || dim1 == 3) {
+		if (range_flags[dim1-2][i][idx] == 0) 
+			return 0;
+	}
+	
+	return 1;
+
+	check_rulesets[check_heads[idx]][idx] = ruleset;
+	// set range cover flags for judge of port-cut redundancy
+	if (dim0 == 2 || dim0 == 3)
+		set_range_cover(ruleset, nrules, dim0, parent_borders[0], check_heads[idx]);
+	if (dim1 == 2 || dim1 == 3)
+		set_range_cover(ruleset, nrules, dim1, parent_borders[1], check_heads[idx]);
+
+	check_heads[idx] = (check_heads[idx] + 1) % CHECK_NODES;
+	if (check_heads[idx] == check_tails[idx])
+		check_tails[idx] = (check_tails[idx] + 1) % CHECK_NODES;
+}
+
+
+
+// ============================================================================
+// section for rule redundancy check
+// ============================================================================
+
+
+
+inline
+int rule_collide(Rule *rule, TBits *tb)
+{
+	return range_tbits_overlap(&rule->field[tb->dim], tb);
+}
+
+
+
+// Given a ternary bit string tb, return the max cover space of fields that cover the same area of tb,
+// this function is used for rule redundancy check
+inline
+void rule_cover(Range *field, TBits *path_tb, Range *cover)
+{
+	int		i;
+
+	for (i = 0; i < NFIELDS; i++) {
+		cover[i] = field[i];
+		range_tbits_cover(&cover[i], &path_tb[i]);
+	}
+}
+
+
+
+// cover was computed from a rule r in the same ruleset with higher priority,
+// if rule's cover is within ri's cover, rule is reduandant to r
+inline
+int redundant_rule(Rule *rule, TBits *path_tbits, Range *cover)
+{
+	Range	cover1[NFIELDS];
+	int		i;
+
+	rule_cover(rule->field, path_tbits, cover1);
+	for (i = 0; i < NFIELDS; i++) {
+		if (!range_cover(cover[i], cover1[i]))
+			return 0;
+	}
+	return 1;
+}
+
+
+
+// ===========================================================================
+// section for the main body of trie construction
+// ===========================================================================
+
+
 Trie* init_trie(Rule *rules, int nrules)
 {
 	Trie* 	node = calloc(1, sizeof(Trie));
@@ -104,78 +257,6 @@ void get_path_tbits(Trie *v, TBits *path_tb)
 
 
 
-inline
-int rule_collide(Rule *rule, TBits *tb)
-{
-	return range_tbits_overlap(&rule->field[tb->dim], tb);
-}
-
-
-
-// redundant trie node removal: try to find a ruleset in current children with limited effort
-// (not an exhaustive search, only the recent set with the same number of rules is checked)
-int find_ruleset(Rule **ruleset, int nrules, int dim0, int dim1)
-{
-	int			found = 1;
-
-	if (dim0 == 2 || dim0 ==3) {
-		if (range_flags[dim0-2][nrules-1] == 0)
-			found = 0;
-	}
-	if (dim1 == 2 || dim1 ==3) {
-		if (range_flags[dim1-2][nrules-1] == 0)
-			found = 0;
-	}
-
-	if (tmp_rulesets[nrules-1] == NULL)
-		found = 0;
-	
-	// reduandancy on leaf nodes or IP/prot prefix can be simply checked by idential ruleset
-	// port fileds need first check whether each rule in a child node fully covers parent range
-	if (found) 
-		found = memcmp(ruleset, tmp_rulesets[nrules-1], nrules*sizeof(Rule *)) == 0 ? 1 : 0;
-	
-	if (!found)
-		tmp_rulesets[nrules-1] = ruleset;
-
-	return found;
-}
-
-
-
-// Given a ternary bit string tb, return the max cover space of fields that cover the same area of tb,
-// this function is used for rule redundancy check
-inline
-void rule_cover(Range *field, TBits *path_tb, Range *cover)
-{
-	int		i;
-
-	for (i = 0; i < NFIELDS; i++) {
-		cover[i] = field[i];
-		range_tbits_cover(&cover[i], &path_tb[i]);
-	}
-}
-
-
-
-// cover was computed from a rule r in the same ruleset with higher priority,
-// if rule's cover is within ri's cover, rule is reduandant to r
-inline
-int redundant_rule(Rule *rule, TBits *path_tbits, Range *cover)
-{
-	Range	cover1[NFIELDS];
-	int		i;
-
-	rule_cover(rule->field, path_tbits, cover1);
-	for (i = 0; i < NFIELDS; i++) {
-		if (!range_cover(cover[i], cover1[i]))
-			return 0;
-	}
-	return 1;
-}
-
-
-
 // Add a rule if it is overlaps with territories of tb0 & tb1, and it is not reduandant with 
 // previous rules. return 1 if rule added, otherwise return 0
 inline
@@ -194,7 +275,7 @@ int add_rule(Rule **ruleset, int nrules, Rule *rule, TBits *path_tbits, Trie *v)
 		return 0;
 
 	// check rule redundancy
-	if (nrules <= TMP_NRULES) {
+	if (nrules <= CHECK_NRULES) {
 		for (i = 0; i < nrules; i++) {
 			cover = rule_covers[ruleset[i]->id];
 			if (redundant_rule(rule, path_tbits, cover))
@@ -219,9 +300,10 @@ int add_rule(Rule **ruleset, int nrules, Rule *rule, TBits *path_tbits, Trie *v)
 void new_child(Trie *v, TBits *path_tbits, Range *parent_borders)
 {
 	Trie		*u;
-	int			nrules = 0, found, i, j, dim;
+	int			nrules = 0, found, i, j, dim0, dim1;
 	Range		tb_borders[2];
 
+	dim0 = v->cut_bands[0].dim; dim1 = v->cut_bands[1].dim;
 	u = &v->children[v->nchildren];
 	u->rules = (Rule **) malloc(v->nrules * sizeof(Rule *));
 
@@ -236,17 +318,18 @@ void new_child(Trie *v, TBits *path_tbits, Range *parent_borders)
 	}
 
 	// check node redundancy
-	if (nrules <= TMP_NRULES)
-		found = find_ruleset(u->rules, nrules, v->cut_bands[0].dim, v->cut_bands[1].dim);
-	else
+	if (nrules <= CHECK_NRULES) {
+		found = find_ruleset(u->rules, nrules, dim0, dim1, parent_borders);
+	} else {
 		found = 0;
+	}
 	if (found) {
 		free(u->rules);
 		return;
 	}
-
 	if (nrules < v->nrules)
 		u->rules = realloc(u->rules, nrules * sizeof(Rule *));
+
 	u->layer = v->layer + 1;
 	u->id = total_nodes++;
 	u->parent = v;
@@ -261,21 +344,9 @@ void new_child(Trie *v, TBits *path_tbits, Range *parent_borders)
 		trie_nodes = realloc(trie_nodes, trie_nodes_size*sizeof(Trie *));
 	}
 	trie_nodes[total_nodes-1] = u;
-	
-	// set range cover flags for judge of port-cut redundancy
-	for (i = 0; i < 2; i++) {
-		dim = v->cut_bands[i].dim;
-		if (dim == 2 || dim == 3) { 
-			range_flags[dim-2][nrules-1] = 1;
-			for (j = 0; j < nrules; j++) {
-				if (!range_cover(u->rules[j]->field[dim], parent_borders[i])) {
-					range_flags[dim-2][nrules-1] = 0;
-					break;
-				}
-			}
-		}
-	}
 
+	update_check_rulesets(u->rules, nrules, dim0, dim1, parent_borders);
+	
 //printf("\tnode[%d<-%d#%d]@%d: %d rules\n", u->id, v->id, v->nrules, u->layer, u->nrules);
 }
 
@@ -298,9 +369,7 @@ void create_children(Trie* v)
 	choose_bands(v, path_tbits);
 
 	v->children = (Trie *) calloc(MAX_CHILDREN, sizeof(Trie));
-	memset(tmp_rulesets, 0, TMP_NRULES*sizeof(Rule **));
-	memset(range_flags[0], 0, TMP_NRULES*sizeof(uint8_t));
-	memset(range_flags[1], 0, TMP_NRULES*sizeof(uint8_t));
+	reset_check_rules();
 //printf("create_children %d\n", v->id);
 	// assign each potential child its cut band values, then try to generate the child
 	for (val0 = 0; val0 < BAND_SIZE; val0++) {
