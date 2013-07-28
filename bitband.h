@@ -38,4 +38,9 @@ int range_tbits_overlap(Range *range, TBits *tbits);
 inline
 int free_band(TBits *tbits, int curr_band);
 
+inline
+Range tbits_range(TBits *tbits);
+
+void dump_tbits(TBits *tb);
+
 #endif

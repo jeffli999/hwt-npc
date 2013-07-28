@@ -13,7 +13,11 @@ typedef struct {
 } Range;
 
 
+inline
 int range_overlap(Range a, Range b);
+
+inline
+Range range_sect(Range a, Range b);
 
 
 // bit operations for 8/16/32-bit unsigned integers

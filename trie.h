@@ -40,6 +40,7 @@ void dump_node(Trie *v, int simple);
 void dump_node_rules(Trie *v);
 void check_small_rules(int size);
 void dump_nodes(int max, int min);
+void dump_rules(Rule **rules, int nrules);
 
 
 #endif

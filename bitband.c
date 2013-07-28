@@ -205,9 +205,10 @@ inline
 Range tbits_range(TBits *tbits)
 {
 	int			i, hi, lo;
-	uint32_t	border = 0, bits, side_bits;
-	uint32_t	range;
+	uint32_t	bits;
+	Range		range;
 
+	range.lo = range.hi = 0;
 	for (i = field_bands[tbits->dim]-1; i >= 0; i--) {
 		hi = band_msb(i); lo = band_lsb(i);
 		if (tbits->bandmap[i]) {
@@ -241,19 +242,20 @@ void range_tbits_cover(Range *r, TBits *tbits)
 {
 	int			band;
 	uint32_t	border;
+	Range		range_tb = tbits_range(tbits);
 
 	if (!point_in_bank(r->lo, tbits, &band)) {
 		if (left_bank_right_border(r->lo, tbits, &border))
 			r->lo = border + 1;
 		else
-			r->lo = tbits_border(tbits, 0);
+			r->lo = range_tb.lo;
 	}
 
 	if (!point_in_bank(r->hi, tbits, &band)) {
 		if (right_bank_left_border(r->hi, tbits, &border))
 			r->hi = border - 1;
 		else
-			r->hi = tbits_border(tbits, 1);
+			r->hi = range_tb.hi;
 	}
 }
 
@@ -311,3 +313,25 @@ void set_tbits_band(TBits *tb_set, Band *band)
 	}
 	set_tbits(tb, band->id, band->val);
 }
+
+
+
+void dump_tbits(TBits *tb)
+{
+	int		i, n;
+
+	if (tb->dim < 2)
+		n = 8;
+	else if (tb->dim > 3)
+		n = 2;
+	else
+		n = 4;
+
+	for (i = n; i >= 0; i--) {
+		if (tb->bandmap[i])
+			printf("%x", extract_bits(tb->val, band_msb(i), band_lsb(i)));
+		else
+			printf("*");
+	}
+}
+
