@@ -27,6 +27,8 @@ typedef struct {
 typedef struct {
 	uint8_t		dim;		// dimension of the ternary bit string
 	uint8_t		nbands;		// reduandant to band_map, for efficiency purpose
+	uint8_t		band_lo;	// lowest non-* band (MAX_BANDS when non-existant)
+	uint8_t		band_hi;	// highest non-* band (0 when non-existant)
 	uint8_t		bandmap[MAX_BANDS];	// 0 for * bands; 1 for others; band_map[0] for LSB
 	uint32_t	val;		// bit values
 } TBits;

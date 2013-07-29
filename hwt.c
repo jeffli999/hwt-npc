@@ -165,11 +165,20 @@ int big_cut_fit(Trie *v, TBits *path_tb, int dim, int bid)
 	Rule	*rule;
 	Range	*cover;
 	int		val, total = 0, dup, even, max = 0, i, j;
+	int		old_hi =  = -1; old_lo = -1;
 
 	// change path_tb for computing the fit of a band cut
 	// and recover it afer done (no return is allowed in between)
 	path_tb[dim].nbands++;
 	path_tb[dim].bandmap[bid] = 1;
+	if (bid > path_tb[dim].band_hi) {
+		old_hi = path_tb[dim].band_hi;
+		path_tb[dim].band_hi = bid;
+	}
+	if (bid < path_tb[dim].band_lo) {
+		old_lo = path_tb[dim].band_lo;
+		path_tb[dim].band_lo = bid;
+	}
 
 	for (val = 0; val < BAND_SIZE; val++) {
 		hwt[val] = 0;
@@ -206,6 +215,10 @@ int big_cut_fit(Trie *v, TBits *path_tb, int dim, int bid)
 	// recover path_tb, which wil be used again in future
 	path_tb[dim].nbands--;
 	path_tb[dim].bandmap[bid] = 0;
+	if (old_hi >= 0)
+		path_tb[dim].band_hi = old_hi;
+	if (old_lo >= 0)
+		path_tb[dim].band_lo = old_lo;
 
 	do_hwt(hwt, BAND_SIZE);
 	
@@ -280,12 +293,20 @@ void small_cut_fit(Rule **rules, int nrules, TBits *tb_set, int dim, int bid, Sm
 {
 	Range	*cover;
 	Rule	*rule;
-	int		val, total = 0, max = 0, i, j;
+	int		val, total = 0, max = 0, i, j, old_hi = -1, old_lo = -1;
 
 	// change tb_set for computing the fit of a band cut
 	// and recover it afer done (no return is allowed in between)
 	tb_set[dim].nbands++;
 	tb_set[dim].bandmap[bid] = 1;
+	if (bid > tb_set[dim].band_hi) {
+		old_hi = tb_set[dim].band_hi;
+		tb_set[dim].band_hi = bid;
+	}
+	if (bid < tb_set[dim].band_lo) {
+		old_lo = tb_set[dim].band_lo;
+		tb_set[dim].band_lo = bid;
+	}
 
 	for (val = 0; val < BAND_SIZE; val++) {
 		hwt[val] = 0;
@@ -329,6 +350,10 @@ void small_cut_fit(Rule **rules, int nrules, TBits *tb_set, int dim, int bid, Sm
 	// recover tb_set, which wil be used again in future
 	tb_set[dim].nbands--;
 	tb_set[dim].bandmap[bid] = 0;
+	if (old_hi >= 0)
+		tb_set[dim].band_hi = old_hi;
+	if (old_lo >= 0)
+		tb_set[dim].band_lo = old_lo;
 }
 
 

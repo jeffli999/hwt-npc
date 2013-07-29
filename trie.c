@@ -102,21 +102,22 @@ void reset_redt_nodes(TBits *tb_set)
 // two situations to qulify a range for redundancy check
 // 1. it is a prefix in its parent space
 // 2. it  fully cover the space of this node
-int port_redund_valid(Rule **rules, int nrules, int dim, TBits *tb_set)
+int port_redund(Rule **rules, int nrules, TBits *tbits, Trie *v)
 {
-	int		i;
+	TBits	tb0 = *tbits, *tb1;
 	Range	range, node_range;
+	int		dim0, dim1, i;
 
-	node_range = tbits_range(&tb_set[dim]);
+	if (v->bands[0].dim == tbits->dim)
+		set_tbits(&tb0, v->bands[0].bid, v->bands[0].val);
+	if (v->bands[1].dim == tbits->dim)
+		set_tbits(&tb0, v->bands[1].bid, v->bands[1].val);
+
 	for (i = 0; i < nrules; i++) {
-		range = range_sect(rules[i]->field[dim], redt_nodes.ports[dim-2]);
-		if (!prefix_range(range)) {
-			if (!range_cover(rules[i]->field[dim], node_range))
-				return 0;	// meet neither of the valid conditions
-		}
+		range = rules->field[tbits->dim];
+		if (!equal_cuts(range, &tb0, tbits)) {
+			return 0;	// meet neither of the valid conditions
 	}
-//dump_tbits(&tb_set[dim]);
-//printf(" tb\n");
 	return 1;
 }
 
@@ -152,11 +153,11 @@ d3found++;
 		return FOUND;
 	// find an identical set, it's redundant for prefix cut; but needs more check on port cut
 	if (dim0 == 2 || dim0 == 3) {
-		if (!port_redund_valid(ruleset, nrules, dim0, tb_set))
+		if (!port_redund(ruleset, nrules, dim0, tb_set))
 			return INVALID;
 	}
 	if (dim1 == 2 || dim1 == 3) {
-		if (!port_redund_valid(ruleset, nrules, dim1, tb_set))
+		if (!port_redund(ruleset, nrules, dim1, tb_set))
 			return INVALID;
 	}
 if (dim0 == 3 || dim1 == 3)
@@ -201,7 +202,7 @@ void rule_cover(Range *field, TBits *path_tb, Range *cover)
 
 	for (i = 0; i < NFIELDS; i++) {
 		cover[i] = field[i];
-		range_tbits_cover(&cover[i], &path_tb[i]);
+		max_tbits_cover(&cover[i], &path_tb[i]);
 	}
 }
 
@@ -315,7 +316,6 @@ void new_child(Trie *v, TBits *path_tbits)
 {
 	Trie		*u;
 	int			nrules = 0, found, i, j, dim0, dim1;
-	Range		tb_borders[2];
 
 	dim0 = v->cut_bands[0].dim; dim1 = v->cut_bands[1].dim;
 	u = &v->children[v->nchildren];
@@ -364,11 +364,11 @@ if (found == INVALID)
 	
 	if (found == NOTFOUND) {
 		if ((u->type == NONLEAF) && (dim0 == 2 || dim0 == 3)) {
-			if (!port_redund_valid(u->rules, u->nrules, dim0, path_tbits))
+			if (!port_redund(u->rules, u->nrules, dim0, path_tbits))
 				return;
 		}
 		if ((u->type == NONLEAF) && (dim1 == 2 || dim1 == 3)) {
-			if (!port_redund_valid(u->rules, u->nrules, dim1, path_tbits))
+			if (!port_redund(u->rules, u->nrules, dim1, path_tbits))
 				return;
 		}
 		update_node_redund(u);
@@ -384,7 +384,6 @@ void create_children(Trie* v)
 {
 	TBits		path_tbits[NFIELDS];
 	uint32_t	val0, val1, bid, dim;
-	Range		tb_borders[2];
 
 //printf("create children[%d]\n", v->id);
 	get_path_tbits(v, path_tbits);
