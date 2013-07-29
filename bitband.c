@@ -355,29 +355,7 @@ int equal_cuts(Range r, TBits *tb1, TBits *tb2)
 	int			i;
 
 	min_tbits_cover(&r1, tb1);
-	i = tb1->band_lo;
-	if (i > 0) {
-		// to check a full cover of bank, partial cover means not equal
-		bits1 = extract_bits(r1.lo, band_lsb(tb1->band_lo)-1, 0);
-		if (bits1 != 0)
-			return 0;
-		bits1 = extract_bits(r1.hi, band_lsb(tb1->band_lo)-1, 0);
-		if ((bits1 & (bits1+1)) != 0)
-			return 0;
-	}
-
 	min_tbits_cover(&r2, tb2);
-	i = tb2->band_lo;
-	if (i > 0) {
-		// to check a full cover of bank, partial cover means not equal
-		bits2 = extract_bits(r2.lo, band_lsb(tb2->band_lo)-1, 0);
-		if (bits2 != 0)
-			return 0;
-		bits2 = extract_bits(r2.hi, band_lsb(tb2->band_lo)-1, 0);
-		if ((bits2 & (bits2+1)) != 0)
-			return 0;
-	}
-
 	for (i = field_bands[tb1->dim]; i >= 0; i--) {
 		if (tb1->bandmap[i])
 			continue;

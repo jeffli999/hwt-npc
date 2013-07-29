@@ -334,8 +334,6 @@ void new_child(Trie *v, TBits *path_tbits)
 	// check node redundancy
 	if (nrules <= REDT_NRULES) {
 		found = check_node_redund(u->rules, nrules, dim0, dim1, path_tbits);
-if (found == INVALID)
-	printf("invalid:%d\n", nrules);
 	} else {
 		found = INVALID;
 	}
@@ -612,7 +610,6 @@ void dump_nodes(int max, int min)
 	for (i = 1; i < total_nodes; i++) {
 		v = trie_nodes[i];
 		n = v->nrules;
-/*
 	//	if ((n <= max) && (n >= min))
 			printf("N[%d<-%d#%d]@%d: #%d  ", 
 					v->id, v->parent->id, v->parent->nrules, v->layer, v->nrules);
@@ -623,21 +620,8 @@ void dump_nodes(int max, int min)
 				printf("d%d-b%d-v%x | d%d-b%d-v%x", 
 						v->bands[0].dim, v->bands[0].id, v->bands[0].val,
 						v->bands[1].dim, v->bands[1].id, v->bands[1].val);
-if (v->bands[0].dim == 3 || v->bands[1].dim == 3)
-	printf(" D3");
 			printf("\n");
-*/
-if ((v->bands[0].dim == 3 || v->bands[1].dim == 3) && (v->nrules <= 5)) {
-	if (p != v->parent) {
-		printf("\n===============================================================================\n");
-		p = v->parent;
-	}
-	printf("\n[%d<-%d#%d]@%d: d%d-b%d-v%x | d%d-b%d-v%x\n", 
-			v->id, v->parent->id, v->parent->nrules, v->layer,
-			v->bands[0].dim, v->bands[0].id, v->bands[0].val,
-			v->bands[1].dim, v->bands[1].id, v->bands[1].val);
-	dump_node_rules(v);
-}
-
+//			if (v->nrules <= 4)
+//				dump_node_rules(v);
 	}
 }
