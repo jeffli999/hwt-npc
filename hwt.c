@@ -165,7 +165,7 @@ int big_cut_fit(Trie *v, TBits *path_tb, int dim, int bid)
 	Rule	*rule;
 	Range	*cover;
 	int		val, total = 0, dup, even, max = 0, i, j;
-	int		old_hi =  = -1; old_lo = -1;
+	int		old_hi = -1, old_lo = -1;
 
 	// change path_tb for computing the fit of a band cut
 	// and recover it afer done (no return is allowed in between)

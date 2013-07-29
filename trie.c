@@ -109,13 +109,13 @@ int port_redund(Rule **rules, int nrules, TBits *tbits, Trie *v)
 	int		dim0, dim1, i;
 
 	if (v->bands[0].dim == tbits->dim)
-		set_tbits(&tb0, v->bands[0].bid, v->bands[0].val);
+		set_tbits(&tb0, v->bands[0].id, v->bands[0].val);
 	if (v->bands[1].dim == tbits->dim)
-		set_tbits(&tb0, v->bands[1].bid, v->bands[1].val);
+		set_tbits(&tb0, v->bands[1].id, v->bands[1].val);
 
 	for (i = 0; i < nrules; i++) {
-		range = rules->field[tbits->dim];
-		if (!equal_cuts(range, &tb0, tbits)) {
+		range = rules[i]->field[tbits->dim];
+		if (!equal_cuts(range, &tb0, tbits))
 			return 0;	// meet neither of the valid conditions
 	}
 	return 1;
@@ -153,11 +153,11 @@ d3found++;
 		return FOUND;
 	// find an identical set, it's redundant for prefix cut; but needs more check on port cut
 	if (dim0 == 2 || dim0 == 3) {
-		if (!port_redund(ruleset, nrules, dim0, tb_set))
+		if (!port_redund(ruleset, nrules, &tb_set[dim0], redt_nodes.nodeset[idx][i]))
 			return INVALID;
 	}
-	if (dim1 == 2 || dim1 == 3) {
-		if (!port_redund(ruleset, nrules, dim1, tb_set))
+	if ((dim1 != dim0) && (dim1 == 2 || dim1 == 3)) {
+		if (!port_redund(ruleset, nrules, &tb_set[dim1], redt_nodes.nodeset[idx][i]))
 			return INVALID;
 	}
 if (dim0 == 3 || dim1 == 3)
@@ -364,11 +364,11 @@ if (found == INVALID)
 	
 	if (found == NOTFOUND) {
 		if ((u->type == NONLEAF) && (dim0 == 2 || dim0 == 3)) {
-			if (!port_redund(u->rules, u->nrules, dim0, path_tbits))
+			if (!port_redund(u->rules, u->nrules, &path_tbits[dim0], u))
 				return;
 		}
-		if ((u->type == NONLEAF) && (dim1 == 2 || dim1 == 3)) {
-			if (!port_redund(u->rules, u->nrules, dim1, path_tbits))
+		if ((u->type == NONLEAF) && (dim1 == 2 || dim1 == 3) && (dim1 != dim0)) {
+			if (!port_redund(u->rules, u->nrules, &path_tbits[dim1], u))
 				return;
 		}
 		update_node_redund(u);

@@ -258,7 +258,7 @@ int min_tbits_cover(Range *r, TBits *tbits)
 			return 0;
 	}
 
-	return (r.hi >= r.lo);
+	return (r->hi >= r->lo);
 }
 
 
@@ -325,7 +325,7 @@ void add_tbits_band(TBits *tb_set, Band *band)
 	if (band->id > tb->band_hi)
 		tb->band_hi = band->id;
 	else if (band->id < tb->band_lo)
-		tb->band_lo = band_id;
+		tb->band_lo = band->id;
 	set_tbits(tb, band->id, band->val);
 }
 
@@ -348,7 +348,7 @@ void set_tbits_band(TBits *tb_set, Band *band)
 
 // Given a range and two tbits with the same set of cut bands (but different cut values), 
 // whether the overlaps of r with the two tbits are equal for subsequent cuts along this dimension
-int equal_cuts(Range r, Tbits *tb1, TBits *tb2)
+int equal_cuts(Range r, TBits *tb1, TBits *tb2)
 {
 	Range		r1 = r, r2 = r;
 	uint32_t	bits1, bits2;
@@ -359,10 +359,10 @@ int equal_cuts(Range r, Tbits *tb1, TBits *tb2)
 	if (i > 0) {
 		// to check a full cover of bank, partial cover means not equal
 		bits1 = extract_bits(r1.lo, band_lsb(tb1->band_lo)-1, 0);
-		if (bits != 0)
+		if (bits1 != 0)
 			return 0;
 		bits1 = extract_bits(r1.hi, band_lsb(tb1->band_lo)-1, 0);
-		if ((bits & (bits+1)) != 0)
+		if ((bits1 & (bits1+1)) != 0)
 			return 0;
 	}
 
@@ -371,14 +371,14 @@ int equal_cuts(Range r, Tbits *tb1, TBits *tb2)
 	if (i > 0) {
 		// to check a full cover of bank, partial cover means not equal
 		bits2 = extract_bits(r2.lo, band_lsb(tb2->band_lo)-1, 0);
-		if (bits != 0)
+		if (bits2 != 0)
 			return 0;
 		bits2 = extract_bits(r2.hi, band_lsb(tb2->band_lo)-1, 0);
-		if ((bits & (bits+1)) != 0)
+		if ((bits2 & (bits2+1)) != 0)
 			return 0;
 	}
 
-	for (i = fieldbands[tb1->dim]; i >= 0; i--) {
+	for (i = field_bands[tb1->dim]; i >= 0; i--) {
 		if (tb1->bandmap[i])
 			continue;
 		bits1 = extract_bits(r1.lo, band_msb(i), band_lsb(i));
