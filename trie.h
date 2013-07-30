@@ -7,6 +7,7 @@
 #define MAX_CHILDREN	256		// BAND_SIZE power2 CUT_BANDS
 #define LEAF_RULES		4		// upper limit on rules in lefa nodes
 #define	SMALL_NODE		16		// node is small with rules less than this
+#define MAX_LAYER		6
 
 
 enum { LEAF, NONLEAF };

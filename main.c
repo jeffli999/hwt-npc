@@ -3,6 +3,8 @@
 #include "common.h"
 #include "bitband.h"
 #include "rule.h"
+#include "trie.h"
+#include "stats.h"
 
 
 void test_range()
@@ -71,10 +73,12 @@ int main(int argc, char **argv)
 	}
 
 	num_rules = loadrules(fp, &ruleset);
+	fclose(fp);
 	//dump_ruleset(ruleset, num_rules);
 	build_trie(ruleset, num_rules);
 
-	fclose(fp);
+	collect_stats();
+	dump_stats();
 
 	//test_band();
 }

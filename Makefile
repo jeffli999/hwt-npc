@@ -1,4 +1,4 @@
-SRC=main.c common.c bitband.c rule.c trie.c hwt.c
+SRC=main.c common.c bitband.c rule.c trie.c hwt.c stats.c
 
 all: $(SRC)
-	gcc -g -O2 $(SRC) -o main
+	gcc -g $(SRC) -o main
