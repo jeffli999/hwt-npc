@@ -7,7 +7,7 @@
 extern int	max_fit;
 
 Trie	*trie_root;
-int		total_nodes = 0, unique_nodes = 0;
+int		total_nodes = 0, unique_nodes = 0, total_redundant = 0, total_empty = 0;
 Trie	**trie_nodes;
 int		trie_nodes_size = 10240;
 Trie	**queue;
@@ -328,6 +328,7 @@ void new_child(Trie *v, TBits *path_tbits)
 	}
 	if (nrules == 0) {
 		free(u->rules);
+		total_empty++;
 		return;
 	}
 
@@ -340,6 +341,7 @@ void new_child(Trie *v, TBits *path_tbits)
 
 	if (found == FOUND) {
 		free(u->rules);
+		total_redundant++;
 		return;
 	}
 
@@ -442,7 +444,8 @@ Trie* build_trie(Rule *rules, int nrules)
 dump_nodes(16, 8);
 //check_small_rules(8);
 printf("d3all: %d; d3found: %d; d3valid: %d\n", d3all, d3found, d3valid);
-	printf("Trie nodes: %d\n", total_nodes);
+	printf("Trie nodes: %d, empty slots: %d, redundant nodes: %d\n",
+			total_nodes, total_empty, total_redundant);
 //printf("max_fit: %d\n", max_fit);
 //dump_trie(trie_root);
 }
