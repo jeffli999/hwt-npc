@@ -625,3 +625,116 @@ void dump_nodes(int max, int min)
 //				dump_node_rules(v);
 	}
 }
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                //
+//                              Complete Rewrite                                                  //
+//                                                                                                //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+typedef struct {
+	uint8_t		next[MAX_BANDS];
+	uint8_t		head;
+} BandLink;
+
+
+// data structures for dfs based trie construction
+Rule	  **dfs_rules[MAX_DEPTH];
+int			dfs_nrules[MAX_DEPTH];
+BandLink	dfs_blinks[MAX_DEPTH];
+Band		dfs_cuts[MAX_DEPTH][2];
+Rule	   *dfs_rules_strip[MAX_DEPTH][MAX_CHILDREN];
+
+
+void init_bandlink(BandLink *blink, int dim)
+{
+	int		n;
+
+	if (dim <= 1)
+		blink->head = 7;
+	else if (dim == 4)
+		blink->head = 1;
+	else
+		blink->head = 3;
+
+	for (i = blink->head; i >= 0; i--)
+		blink->next[i] = i - 1;
+}
+
+
+
+void select_rules(Trie *v)
+{
+	int		nrules = 0, i;
+
+	n = dfs_nrules[v->layer];
+
+	for (i = 0; i < n; i++) {
+	}
+}
+
+
+
+// cut v with two bands from the five fields
+Trie* new_child(Trie *v)
+{
+	int		i, redund;
+	Trie	*u;
+
+	select_rules(v);
+	redund = check_redundancy(v);
+	if (redund)
+		return NULL;
+
+	u = v->children[v->nchildren++];
+	u->parent = v;
+	u->layer = v->layer + 1;
+	u->id = total_nodes++;
+	u->bands[0] = dfs_cuts[v->layer][0];
+	u->bands[1] = dfs_cuts[v->layer][1];
+	u->nrules = dfs_nrules[v->layer];
+	u->type = nrules > LEAF_RULES ? NONLEAF : LEAF;
+	memcpy(u->rules, dfs_rules[d], dfs_nrules[d]*sizeof(Rule));
+
+	return u;
+}
+
+
+
+void create_children(Trie *v)
+{
+	int		val0, val1;
+
+	if (v->layer > MAX_DEPTH) {
+		printf("Oops, tree depth > %d!\n", MAX_DEPTH);
+		exit(1);
+	}
+	
+	v->children = malloc(MAX_CHILDREN * sizeof(Trie));
+	choose_bands(v);
+	for (val0 = 0; val0 < BAND_SIZE; val0++) {
+		dfs_cuts[v->layer][0].val = val0;
+		for (val1 = 0; val1 < BAND_SIZE; val1++) {
+			dfs_cuts[v->layer][1].val = val1;
+			u = new_child(v);
+			if ((u != NULL) && (u->nrules > LEAF_RULES))
+				create_children(u);	
+		}
+	}
+	v->children = realloc(v->children, v->nchildren*sizeof(Trie));
+}
+
+
+
+// trie construction with a depth-first traverse (dfs)
+Trie* build_trie(Rule *rules, int nrules)
+{
+	Trie*	v;
+	int		i;
+
+	trie_root = init_trie(rules, nrules);
+	create_children(trie_root);
+}
